@@ -101,7 +101,10 @@ o mesmo banco, com o risco de divergirem outra vez.
 
 ## Netlify
 
-Variáveis: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`
+Quatro variáveis: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`
+
+A lista completa, com o que quebra sem cada uma e o que **não** deve ser
+cadastrado, está em [DEPLOY-VARIAVEIS.md](DEPLOY-VARIAVEIS.md).
 
 `DATABASE_URL` **não** é usada em produção — só o seed e os scripts locais
 precisam dela.
@@ -143,7 +146,7 @@ Um lock quebrado pode passar no deploy e falhar só no CI. Quem manda é o CI.
 | `npm run dev` | Desenvolvimento |
 | `npm run build` | Build produção |
 | `npm run db:seed` | Cria admin inicial |
-| `npm run check:env` | Valida `.env.local` |
+| `npm run check:env` | Valida `.env.local` e confere se o banco apontado é o migrado |
 | `npm run db:deploy-sql` | Regera `supabase/deploy-producao.sql` a partir das migrations |
 | `npm run db:deploy-sql -- --check` | Só confere: sai com código 1 se o SQL estiver fora de sincronia com `supabase/migrations/` |
 
