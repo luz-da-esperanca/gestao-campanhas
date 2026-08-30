@@ -104,23 +104,31 @@ Abra http://localhost:3000 e entre com:
 
 ---
 
-## Vercel (depois que funcionar no PC)
+## Netlify (depois que funcionar no PC)
 
-No site da Vercel → seu projeto → **Settings → Environment Variables**
+No painel do Netlify → seu site → **Site configuration → Environment variables**
 
-Adicione **as mesmas** variáveis do `.env.local`:
+Adicione:
 
 | Nome | Valor |
 |------|--------|
 | NEXT_PUBLIC_SUPABASE_URL | https://SEU-PROJECT-REF.supabase.co |
-| NEXT_PUBLIC_SUPABASE_ANON_KEY | (igual ao .env.local) |
+| NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY | (igual ao .env.local) |
 | SUPABASE_SERVICE_ROLE_KEY | (igual ao .env.local) |
-| DATABASE_URL | (igual ao .env.local) |
-| NEXT_PUBLIC_APP_URL | https://SEU-SITE.vercel.app |
-| SEED_ADMIN_* | opcional no Vercel |
+| NEXT_PUBLIC_APP_URL | https://SEU-SITE.netlify.app |
 
-Depois: **Deployments → Redeploy**.
+**Não** adicione `DATABASE_URL` nem as `SEED_ADMIN_*`: em produção o site não
+usa nenhuma das duas. O banco é acessado por `supabase-js`, e o admin é criado
+uma vez pelo seed, no seu PC.
 
-No Supabase: **Authentication → URL Configuration** → adicione a URL da Vercel em Redirect URLs.
+Depois: **Deploys → Trigger deploy → Clear cache and deploy site**.
 
-O seed (`npm run db:seed`) rode **no seu PC** uma vez — o banco é o mesmo da Vercel.
+No Supabase: **Authentication → URL Configuration** → adicione a URL do Netlify
+em Redirect URLs.
+
+O seed (`npm run db:seed`) você roda **no seu PC**, uma vez só — o banco é o
+mesmo que o site em produção usa.
+
+A chamada por QR precisa da câmera do celular, e navegador só libera câmera em
+**HTTPS**. O domínio `.netlify.app` já é HTTPS; testar por IP na rede local
+(`http://192.168...`) não funciona.

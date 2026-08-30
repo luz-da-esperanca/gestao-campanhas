@@ -49,7 +49,8 @@ yarn-error.log*
 .env.*
 !.env.example
 
-# vercel
+# plataforma de deploy
+.netlify/
 .vercel
 
 # typescript
