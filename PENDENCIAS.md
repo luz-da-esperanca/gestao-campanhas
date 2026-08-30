@@ -47,60 +47,16 @@ Forma sugerida:
 Custo: uma tabela nova + uma migration + um card. Depende de decidir se o
 workflow escreve no banco (precisaria da service_role no CI) ou em outro lugar.
 
-## Para a TAREFA 4 (deploy-producao.sql)
-- Cabeçalho deve avisar: migrations init/rls/presenca NÃO são idempotentes;
-  script interrompido no meio não pode ser simplesmente recolado.
-- Incluir a 7a migration 20260828000000_rls_completo.sql.
+## TAREFAS 4 e 6 — ENCERRADAS
 
-## Para a TAREFA 6 (backup.yml) — exigências do usuário
-- (a) query real ao banco, servindo de keep-alive
-- (b) falhar RUIDOSAMENTE se não conectar (sem continue-on-error, sem || true)
-- (c) documentar que o monitor externo aponta para /campanhas (lê o banco),
-      não para a raiz. /cadastro e /_not-found são estáticas, não servem.
-- Contexto confirmado pelo usuário: não há API/CLI para despausar o Supabase;
-  90 dias pausado = perde restore de 1 clique; 1 ano = projeto removido.
+Tarefa 4: deploy-producao.sql gerado, com aviso de não-idempotência no topo e
+as 9 migrations. Modo --check em CI desde 2026-08-30.
 
-## TAREFA 7 — ENCERRADA em 2026-08-30
-
-DEPLOY-VARIAVEIS.md criado e check:env reescrito, no mesmo diff como combinado.
-
-Achados que não estavam previstos:
-
-1. **NEXT_PUBLIC_APP_URL tem fallback silencioso** para localhost:3000
-   (src/lib/constants.ts:7) e alimenta getConsultaUrl(), que monta a URL de
-   DENTRO do QR code. Sem ela em produção, todo QR aponta para localhost e o
-   erro só aparece na chamada, no domingo, durante a campanha.
-
-2. **Duas mensagens do próprio projeto afirmavam algo falso**: prisma/seed.ts
-   mandava configurar DATABASE_URL "para o site rodar páginas admin", e
-   test-db-connection.ts dizia "o app admin deve funcionar". Nada em src/
-   importa o Prisma. As duas empurravam a senha do banco para produção sem
-   necessidade. Corrigidas.
-
-3. **A DATABASE_URL do .env.local usa a conexão Direct**, que só resolve em
-   IPv6 — por isso a checagem de schema não conseguiu conectar daqui. O
-   check:env agora reconhece ENETUNREACH e sugere o Session pooler.
-
-4. A primeira versão da regra de senha recusava "Senha@Forte2026", uma senha
-   legítima, por casar com /^senha/i. Reescrita: prefixos só para placeholders
-   de documentação, e lista de senhas fracas comparada pela string inteira.
-
-## PROJETO MORTO clgvsxgbivqgmvmehegm — ENCERRADO em 2026-08-30
-
-Confirmado pelo usuário em 2026-08-28: esse projeto NÃO EXISTE MAIS.
-
-Decisão tomada: trocar por **placeholder `SEU-PROJECT-REF`**, e não pelo ref do
-projeto novo, para o doc não envelhecer de novo. Aplicado nos 6 pontos:
-
-  SETUP-SIMPLES.md   link do dashboard, 2 exemplos de DATABASE_URL,
-                     NEXT_PUBLIC_SUPABASE_URL, tabela de variáveis do painel
-  scripts/test-db-connection.ts:35   mensagem de ajuda
-
-`.env.local.example:7` saiu da lista porque o arquivo foi apagado na Tarefa 8.2.
-
-Sobram duas menções ao ref morto, ambas deliberadas:
-  supabase/config.toml   comentário histórico explicando por que o id mudou
-  PENDENCIAS.md          este registro
+Tarefa 6: três workflows no ar (ci, backup, keep-alive), testados por
+workflow_dispatch. As exigências (a) query real como keep-alive, (b) falhar
+ruidosamente e (c) alvo que lê o banco foram atendidas — o keep-alive consulta
+/rest/v1/campanhas, que executa SQL no Postgres, em vez de bater numa rota
+estática que a borda serviria sem tocar no banco.
 
 ## TAREFAS 8.1 e 8.2 — ENCERRADAS em 2026-08-28
 
@@ -136,17 +92,12 @@ Verificado por varredura: nenhuma das antigas aparece em nenhum arquivo.
   `npm run dev` -> Ready, /login HTTP 200 sem "Supabase não configurado",
   / redireciona para /login?redirect=%2F (e NÃO para ?error=config).
 
-### PENDENTE — dois arquivos redundantes, aguardando confirmação do usuário
-- `.env` (889 B) — idêntico ao `.env.local`. Redundante: perde precedência
-  para o `.env.local`, então é inerte, mas duplica segredos em disco.
-- `.env.local.example` (523 B) — o segundo template. Contém o ref do projeto
-  MORTO (clgvsxgbivqgmvmehegm) e placeholders piores que os do `.env.example`.
-  Não é mais protegido pelo .gitignore (a linha `!` foi removida e nenhum
-  padrão o cobre), então seria commitado como está.
-  Recomendação: apagar os dois. Backup do `.env` original está em
-  scratchpad/env-backup/.env.ORIGINAL
+### Arquivos redundantes — RESOLVIDO em 2026-08-28
 
-## Para a TAREFA 8 (segredos) — já observado
+`.env` e `.env.local.example` apagados com confirmação do usuário. Restaram um
+template (`.env.example`) e um arquivo real (`.env.local`).
+
+## TAREFA 8 — registro do que foi encontrado (ENCERRADA)
 - .env.example tem segredos REAIS (service role, publishable key, senha do banco
   em DATABASE_URL, projeto kqeavgvlqshmdawrsyaj).
 - SETUP-SIMPLES.md linha ~21 original: exemplo de senha "Carlinhos05".
@@ -159,24 +110,25 @@ Verificado por varredura: nenhuma das antigas aparece em nenhum arquivo.
 - middleware -> proxy: depois de produção estabilizada.
 - Não corrigir idempotência das migrations antigas (já aplicadas em dev).
 
-## SINCRONIZAR O PROJETO DE DESENVOLVIMENTO — não esquecer
+## AMBIENTES — nenhuma migration foi aplicada ainda, em lugar nenhum
 
-O projeto de desenvolvimento (supabase/config.toml -> project_id
-clgvsxgbivqgmvmehegm) recebeu apenas as 6 migrations originais. As TRÊS novas
-precisam ser aplicadas lá também:
+ATUALIZADO em 2026-08-30. A versão anterior desta seção falava em sincronizar o
+projeto clgvsxgbivqgmvmehegm, que NÃO EXISTE MAIS.
 
-  20260828000000_rls_completo.sql
-  20260828010000_updated_at_triggers.sql
-  20260828020000_timestamptz_instantes.sql
+Situação real:
+  - clgvsxgbivqgmvmehegm  descontinuado
+  - kqeavgvlqshmdawrsyaj  criado em 2026-08-29, PostgreSQL 17.6.1, é o projeto
+                          de TESTE. Nunca recebeu `supabase db push`.
+  - produção              ainda não existe
 
-  supabase link --project-ref clgvsxgbivqgmvmehegm
-  supabase db push
+Ou seja: as 9 migrations foram validadas em Docker (PG 15 e 17) e o
+deploy-producao.sql foi conferido contra pg_dump, mas NENHUM projeto Supabase
+real tem o schema aplicado.
 
-POR QUE ISTO IMPORTA MAIS DO QUE PARECE
-Sem a 20260828020000, as colunas de instante continuam `timestamp` sem fuso em
-dev, e as funções formatarData/formatarDataHora (src/lib/format-date.ts)
-produzem resultado DIFERENTE nos dois ambientes. Medido, mesma doação (22h BRT
-de 15/03):
+POR QUE A DIVERGÊNCIA ENTRE AMBIENTES IMPORTA MAIS DO QUE PARECE
+Sem a 20260828020000, as colunas de instante ficam `timestamp` sem fuso, e
+format-date.ts produz resultado DIFERENTE em cada ambiente. Medido, mesma
+doação (22h BRT de 15/03):
 
   ambiente          com a migration        sem a migration
   ----------------  ---------------------  ----------------------
@@ -185,13 +137,19 @@ de 15/03):
 
 O modo de falha é traiçoeiro: em produção o erro NÃO aparece, porque o fuso do
 processo coincide com o fuso em que o valor foi gravado. Só se manifesta na
-máquina de desenvolvimento. Um bug reportado em dev pareceria erro do helper,
-quando na verdade é o banco de dev desatualizado.
+máquina de quem desenvolve. Um bug reportado em dev pareceria erro do helper,
+quando a causa seria o banco de dev desatualizado.
 
-Sem a 20260828000000, dev também fica com 8 tabelas SEM RLS — ou seja, um
-ambiente com segurança diferente da produção.
+Sem a 20260828000000, o ambiente fica com 8 tabelas SEM RLS — segurança
+diferente da produção.
 
-## PARA O CHECKLIST-TESTES.md (quando existir) — pedido do usuário
+REGRA: todo ambiente recebe as 9 migrations. Confira com `npm run check:env`,
+que agora acusa tabela faltando, RLS desligado, trigger ausente e coluna com o
+tipo errado.
+
+## CHECKLIST-TESTES.md — CRIADO em 2026-08-30
+
+Os itens abaixo foram para o arquivo, com destaque, como pedido.
 
 Primeira mudança VISÍVEL ao usuário do projeto. Incluir com DESTAQUE:
 
