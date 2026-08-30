@@ -1,0 +1,16 @@
+# https://supabase.com/docs/guides/deployment/branching/github-integration
+# Working directory na integração GitHub: raiz do repositório (.) — NÃO use "supabase" sozinho
+
+# O projeto anterior (clgvsxgbivqgmvmehegm) não existe mais — foi descontinuado.
+# Confirmado em 2026-08-28 via `supabase projects list`: a conta enxerga apenas
+# o projeto abaixo.
+project_id = "kqeavgvlqshmdawrsyaj"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+# 17 confirmado via `supabase projects list` em 2026-08-28: o projeto remoto
+# roda PostgreSQL 17.6.1 (engine 17). Estava 15, herdado do schema.prisma.
+major_version = 17
