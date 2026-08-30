@@ -1,0 +1,25 @@
+-- ============================================================================
+-- ⚠️  ARQUIVO OBSOLETO — NÃO EXECUTE
+-- ============================================================================
+--
+-- Este arquivo nunca teve SQL de verdade (só comentários) e aponta para o
+-- OBSOLETO-setup-completo.sql, que também está desatualizado.
+--
+-- O RLS real do projeto vive em duas migrations:
+--   supabase/migrations/20260526160000_rls.sql        (users, caravaneiros)
+--   supabase/migrations/20260828000000_rls_completo.sql (as outras 8 tabelas)
+--
+-- FONTE DE VERDADE DO SCHEMA:  supabase/migrations/
+--
+--   Método preferencial ..... supabase db push
+--   Método alternativo ...... supabase/deploy-producao.sql (colar no SQL Editor)
+--
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- Conteúdo histórico (instruções removidas — apontavam para o antigo
+-- setup-completo.sql, que também está obsoleto).
+--
+-- Este arquivo nunca conteve SQL executável. O RLS equivalente está em:
+--   supabase/migrations/20260526160000_rls.sql
+-- ----------------------------------------------------------------------------
