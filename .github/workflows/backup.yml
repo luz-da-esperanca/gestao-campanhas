@@ -1,0 +1,171 @@
+name: Backup do banco
+
+# =============================================================================
+# O QUE PRECISA ESTAR CADASTRADO (exige permissão de admin no repositório)
+#
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#
+#   1) DATABASE_URL          (obrigatório — sem ele o job falha de propósito)
+#      Supabase -> Connect -> Session pooler -> URI, trocando [YOUR-PASSWORD]
+#      pela senha do banco. É a credencial mais forte do projeto: dá acesso
+#      total. Só este workflow a usa; o site em produção NÃO precisa dela.
+#
+#   2) HEALTHCHECK_BACKUP_URL   (opcional, mas é o alarme de silêncio)
+#      A "ping URL" do check criado no healthchecks.io. Sem ela o backup
+#      continua rodando, mas ninguém fica sabendo se ele PARAR de rodar —
+#      e-mail do GitHub só avisa de run que falha, nunca de run que não houve.
+# =============================================================================
+
+on:
+  schedule:
+    # 06:00 UTC = 03:00 em Fortaleza. Diário.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: backup-do-banco
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: pg_dump dos schemas public e auth
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # Falhar alto e cedo: sem o secret, não adianta seguir e produzir um
+      # arquivo vazio que passa despercebido.
+      - name: Exigir o secret DATABASE_URL
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::O secret DATABASE_URL não está cadastrado (ou está vazio)."
+            echo "::error::Cadastre em Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "secret presente (${#DATABASE_URL} caracteres)"
+
+      - name: Avisar o healthchecks que o backup começou
+        if: ${{ secrets.HEALTHCHECK_BACKUP_URL != '' }}
+        env:
+          HC: ${{ secrets.HEALTHCHECK_BACKUP_URL }}
+        run: curl -fsS -m 10 --retry 3 "${HC}/start" || true
+
+      # O banco remoto roda PostgreSQL 17. pg_dump mais antigo que o servidor
+      # se recusa a rodar, então instalamos o cliente 17 do repositório oficial
+      # do PostgreSQL em vez de usar o que vem na imagem do runner.
+      - name: Instalar postgresql-client-17
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/postgresql-common/pgdg/pgdg.gpg
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+          versao="$(pg_dump --version | grep -oE '[0-9]+' | head -1)"
+          echo "pg_dump instalado: $(pg_dump --version)"
+          if [ "$versao" != "17" ]; then
+            echo "::error::Esperava pg_dump 17, veio $versao. O servidor é PG 17 e recusa cliente mais antigo."
+            exit 1
+          fi
+
+      - name: Gerar o dump
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          carimbo="$(date -u +%Y-%m-%d_%H%M)"
+          arquivo="backup-${carimbo}.sql.gz"
+          echo "ARQUIVO=${arquivo}" >> "$GITHUB_ENV"
+
+          # pipefail acima é essencial: sem ele, pg_dump pode falhar e o gzip
+          # devolver 0, e o job passaria com um arquivo truncado.
+          pg_dump "$DATABASE_URL" \
+            --no-owner \
+            --no-privileges \
+            --schema=public \
+            --schema=auth \
+            --format=plain \
+            | gzip -9 > "$arquivo"
+
+          ls -l "$arquivo"
+
+      # Um dump que "funcionou" mas veio vazio é pior que um que falhou: parece
+      # proteção e não é. 1 KB é generoso — só o cabeçalho do pg_dump já passa
+      # disso, então abaixo de 1 KB significa que não saiu nada.
+      - name: Recusar dump menor que 1 KB
+        run: |
+          set -euo pipefail
+          bytes="$(stat -c%s "$ARQUIVO")"
+          echo "tamanho: ${bytes} bytes"
+          if [ "$bytes" -lt 1024 ]; then
+            echo "::error::Dump com ${bytes} bytes (menos de 1 KB). Backup considerado inválido."
+            exit 1
+          fi
+          # Confere também que o gzip não está corrompido e que o conteúdo
+          # parece mesmo um dump.
+          gzip -t "$ARQUIVO"
+          if ! zcat "$ARQUIVO" | head -40 | grep -q "PostgreSQL database dump"; then
+            echo "::error::O arquivo não parece um dump do PostgreSQL."
+            exit 1
+          fi
+          echo "dump íntegro"
+
+      - name: Guardar como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARQUIVO }}
+          path: ${{ env.ARQUIVO }}
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Avisar o healthchecks que deu certo
+        if: ${{ success() && secrets.HEALTHCHECK_BACKUP_URL != '' }}
+        env:
+          HC: ${{ secrets.HEALTHCHECK_BACKUP_URL }}
+        run: curl -fsS -m 10 --retry 3 "${HC}"
+
+      - name: Avisar o healthchecks que falhou
+        if: ${{ failure() && secrets.HEALTHCHECK_BACKUP_URL != '' }}
+        env:
+          HC: ${{ secrets.HEALTHCHECK_BACKUP_URL }}
+        run: curl -fsS -m 10 --retry 3 "${HC}/fail" || true
+
+      # Camada 2: Issue notifica todos os watchers do repositório e fica
+      # visível na aba Issues. E-mail de Actions vai só para quem mexeu no
+      # cron por último — não serve para a instituição.
+      - name: Abrir ou atualizar Issue em caso de falha
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create backup-falhou --color B60205 \
+            --description "Backup automático do banco falhou" 2>/dev/null || true
+
+          corpo="O backup automático falhou em $(date -u '+%Y-%m-%d %H:%M UTC').
+
+Run: ${RUN_URL}
+
+Enquanto isso não for resolvido, não há backup novo do banco.
+Causas mais comuns: senha do banco trocada sem atualizar o secret
+DATABASE_URL, ou projeto Supabase pausado."
+
+          existente="$(gh issue list --state open --label backup-falhou \
+                        --json number --jq '.[0].number // empty')"
+          if [ -n "$existente" ]; then
+            gh issue comment "$existente" --body "$corpo"
+          else
+            gh issue create --title "Backup do banco falhou" \
+              --label backup-falhou --body "$corpo"
+          fi
