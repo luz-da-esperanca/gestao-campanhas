@@ -18,9 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # node-version-file, e não um número aqui: assim o CI, o Netlify e a
+      # máquina de quem desenvolve leem a MESMA fonte (.nvmrc). Foi a
+      # divergência de versão de npm que quebrou o primeiro run deste CI.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci

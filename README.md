@@ -111,6 +111,31 @@ Netlify já serve por HTTPS; em rede local, `http://` não funciona.
 
 Seed do admin roda no PC (`npm run db:seed`), não no Netlify.
 
+## Node e o `package-lock.json`
+
+A versão do Node está fixada em `.nvmrc`. Três lugares leem esse arquivo: o CI
+(`node-version-file`), o Netlify (que dá precedência ao `.nvmrc` sobre a
+configuração do painel) e quem desenvolve usando nvm.
+
+**Gere o `package-lock.json` com o npm que vem com essa versão do Node** — hoje,
+npm 10:
+
+```bash
+npx npm@10.9.8 install --package-lock-only
+```
+
+O npm 11 grava um lock que omite entradas de dependência opcional que o npm 10
+exige. O lock gerado pelo npm 10 serve para os dois; o contrário não. Um lock
+gerado com o npm errado quebra o CI assim:
+
+```
+npm error Missing: @emnapi/runtime@1.11.3 from lock file
+```
+
+Atenção a uma assimetria: o **CI roda `npm ci`**, que é estrito quanto a isso, e
+o **Netlify roda `npm install`**, que é tolerante e corrige o lock em silêncio.
+Um lock quebrado pode passar no deploy e falhar só no CI. Quem manda é o CI.
+
 ## Scripts
 
 | Comando | Descrição |
