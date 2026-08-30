@@ -1,28 +1,33 @@
 # Pendências carregadas entre tarefas — Luz da Esperança
 
-## Para a TAREFA 5 (README) — combinado com o usuário
+## TAREFA 5 (docs) — ENCERRADA em 2026-08-30
 
-0. **Documentar `npm run db:deploy-sql -- --check` no README.**
-   O modo --check só protege se alguém souber que existe. Candidatos a
-   mencionar: a seção de scripts do README, e o passo de criar migration.
-   Ideal seria rodar em CI, mas o projeto não tem CI hoje além do
-   .github/workflows/backup.yml que a Tarefa 6 vai criar.
+Tudo o que estava listado aqui foi feito. Registro do que mudou:
 
+1. **Âncora quebrada — resolvida.** O heading criado é exatamente
+   `## Schema do banco e o papel do Prisma` (README.md:32), e os dois links
+   do README que apontam para `#schema-do-banco-e-o-papel-do-prisma` resolvem.
+   Conferido por script que aplica a regra de slug do GitHub.
 
-1. **Âncora quebrada no README.md**
-   README.md linha ~28 aponta para `#schema-do-banco-e-o-papel-do-prisma`,
-   seção que ainda NÃO existe. Criada na Tarefa 5. O texto exato do link:
-   `> Veja [Schema do banco e o papel do Prisma](#schema-do-banco-e-o-papel-do-prisma).`
-   => O heading da Tarefa 5 precisa ser exatamente:
-      `## Schema do banco e o papel do Prisma`
+2. **Vercel -> Netlify — feito, varrendo o repositório inteiro.**
+   Além dos dois docs mapeados, a varredura achou `public/vercel.svg`
+   (asset do scaffold, sem nenhuma referência no código — removido) e a
+   entrada `.vercel` no .gitignore (mantida, com `.netlify/` ao lado).
+   As menções que sobram neste arquivo são registro histórico.
 
-2. **Vercel -> Netlify nos docs** (usuário pediu para fazer NA TAREFA 5)
-   - README.md: seção `## Vercel` (linha ~47 no original) e a frase
-     "Seed do admin roda no PC (`npm run db:seed`), não na Vercel."
-   - SETUP-SIMPLES.md: seção `## Vercel (depois que funcionar no PC)`,
-     "No site da Vercel -> seu projeto -> Settings -> Environment Variables",
-     tabela com `https://SEU-SITE.vercel.app`, "Deployments -> Redeploy".
-   - Verificar com: grep -rni "vercel" README.md SETUP-SIMPLES.md
+3. **Projeto morto — 6 referências viraram `SEU-PROJECT-REF`.**
+   Ver a seção abaixo.
+
+4. **`npm run db:deploy-sql -- --check` documentado** na tabela de scripts do
+   README, com a descrição do que ele faz e do exit 1.
+
+5. **Extra, achado na varredura:** o README apontava para
+   `https://github.com/CarlosDVSS/Luz-Esperan-a`, que não é o repositório
+   deste projeto. Corrigido para `luz-da-esperanca/gestao-campanhas`.
+
+6. **Extra:** a senha de exemplo `Carlinhos05` em SETUP-SIMPLES.md:46 parecia
+   uma senha real de alguém. Trocada por texto genérico, a pedido do usuário,
+   que ficou de falar com quem passou o projeto.
 
 ## Para a TAREFA 4 (deploy-producao.sql)
 - Cabeçalho deve avisar: migrations init/rls/presenca NÃO são idempotentes;
@@ -53,23 +58,22 @@ scripts/check-env.ts uma verificação de SCHEMA:
   - Usuário pediu explicitamente para NÃO tocar check-env.ts duas vezes:
     fazer isto e o checklist de variáveis no MESMO diff.
 
-## PROJETO MORTO clgvsxgbivqgmvmehegm ainda referenciado em 5 arquivos
+## PROJETO MORTO clgvsxgbivqgmvmehegm — ENCERRADO em 2026-08-30
 
 Confirmado pelo usuário em 2026-08-28: esse projeto NÃO EXISTE MAIS.
-config.toml já foi corrigido para kqeavgvlqshmdawrsyaj. Falta corrigir:
 
-  SETUP-SIMPLES.md:50   link do dashboard -> /project/clgvsxgbivqgmvmehegm/settings/database
-  SETUP-SIMPLES.md:55   exemplo de DATABASE_URL com postgres.clgvsxgbivqgmvmehegm
-  SETUP-SIMPLES.md:69   NEXT_PUBLIC_SUPABASE_URL=https://clgvsxgbivqgmvmehegm.supabase.co
-  SETUP-SIMPLES.md:72   idem DATABASE_URL
-  SETUP-SIMPLES.md:115  tabela de variáveis do painel
-  scripts/test-db-connection.ts:35  mensagem de ajuda cita postgres.clgvsxgbivqgmvmehegm
-  .env.local.example:7  DATABASE_URL com postgres.clgvsxgbivqgmvmehegm
+Decisão tomada: trocar por **placeholder `SEU-PROJECT-REF`**, e não pelo ref do
+projeto novo, para o doc não envelhecer de novo. Aplicado nos 6 pontos:
 
-Quem seguir esses passos hoje aponta para um projeto inexistente e recebe erro
-de conexão sem entender por quê. Corrigir nas Tarefas 5 (docs) e 7 (env).
-DECISÃO PENDENTE: trocar por um placeholder (SEU-PROJECT-REF) em vez do ref
-real, para o doc não envelhecer de novo quando o projeto de produção for criado.
+  SETUP-SIMPLES.md   link do dashboard, 2 exemplos de DATABASE_URL,
+                     NEXT_PUBLIC_SUPABASE_URL, tabela de variáveis do painel
+  scripts/test-db-connection.ts:35   mensagem de ajuda
+
+`.env.local.example:7` saiu da lista porque o arquivo foi apagado na Tarefa 8.2.
+
+Sobram duas menções ao ref morto, ambas deliberadas:
+  supabase/config.toml   comentário histórico explicando por que o id mudou
+  PENDENCIAS.md          este registro
 
 ## TAREFAS 8.1 e 8.2 — ENCERRADAS em 2026-08-28
 
