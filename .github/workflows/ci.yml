@@ -1,0 +1,32 @@
+name: CI
+
+# Roda em todo push e em todo pull request, como combinado.
+# Nenhum job aqui usa secrets: o repositório é público e um pull request
+# vindo de um fork não deve ganhar acesso a credencial nenhuma.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-sql-em-sincronia:
+    name: deploy-producao.sql confere com as migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Sai com código 1 se alguém mexeu em supabase/migrations/ e esqueceu
+      # de regerar o supabase/deploy-producao.sql. Sem isso, quem usa o SQL
+      # avulso (quem não tem o CLI) aplica um schema desatualizado sem aviso.
+      - name: npm run db:deploy-sql -- --check
+        run: npm run db:deploy-sql -- --check
