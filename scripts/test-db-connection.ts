@@ -32,7 +32,7 @@ Dica: a URL direct (db....supabase.co) usa só IPv6 e costuma falhar no Windows.
 
 No Supabase → Connect → Direct connection string:
   • Mude para "Session pooler" (não "Direct")
-  • Copie a URI com postgres.clgvsxgbivqgmvmehegm no usuário
+  • Copie a URI com postgres.SEU-PROJECT-REF no usuário
   • Cole em DATABASE_URL no .env.local
 
 O npm run db:seed NÃO precisa mais de DATABASE_URL (usa API).

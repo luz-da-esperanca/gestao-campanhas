@@ -30,7 +30,7 @@ Se o CLI não funcionar na sua máquina:
 
 **Atenção:** algumas migrations antigas não são idempotentes. Se o script
 falhar no meio, não basta rodar de novo — veja as instruções no topo do
-`deploy-producao.sql`.
+`supabase/deploy-producao.sql`.
 
 ---
 
@@ -43,16 +43,16 @@ Na janela **"Connect to your project"**:
 3. Modo: **Session** (Session pooler)
 4. Clique **Copy**
 5. Cole no `.env.local` em `DATABASE_URL=`
-6. Troque `[YOUR-PASSWORD]` por sua senha (ex: `Carlinhos05`)
+6. Troque `[YOUR-PASSWORD]` pela senha do banco que você definiu
 
 **Atenção:** a aba **Framework** só mostra URL e publishable key — isso NÃO é o DATABASE_URL.
 
-Alternativa: https://supabase.com/dashboard/project/clgvsxgbivqgmvmehegm/settings/database → Connection string
+Alternativa: https://supabase.com/dashboard/project/SEU-PROJECT-REF/settings/database → Connection string
 
 A linha final fica assim (exemplo, a sua será parecida):
 
 ```
-DATABASE_URL=postgresql://postgres.clgvsxgbivqgmvmehegm:MinhaSenha123@aws-0-sa-east-1.pooler.supabase.com:5432/postgres
+DATABASE_URL=postgresql://postgres.SEU-PROJECT-REF:sua-senha-do-banco@aws-0-sa-east-1.pooler.supabase.com:5432/postgres
 ```
 
 ---
@@ -66,10 +66,10 @@ O Supabase pode mostrar `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — **é a mesma 
 Exemplo completo:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://clgvsxgbivqgmvmehegm.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJECT-REF.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
-DATABASE_URL=postgresql://postgres.clgvsxgbivqgmvmehegm:SUA_SENHA@....pooler.supabase.com:5432/postgres
+DATABASE_URL=postgresql://postgres.SEU-PROJECT-REF:sua-senha-do-banco@....pooler.supabase.com:5432/postgres
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 SEED_ADMIN_EMAIL=admin@luzespe.local
 SEED_ADMIN_PASSWORD=change-me-123456
@@ -112,7 +112,7 @@ Adicione **as mesmas** variáveis do `.env.local`:
 
 | Nome | Valor |
 |------|--------|
-| NEXT_PUBLIC_SUPABASE_URL | https://clgvsxgbivqgmvmehegm.supabase.co |
+| NEXT_PUBLIC_SUPABASE_URL | https://SEU-PROJECT-REF.supabase.co |
 | NEXT_PUBLIC_SUPABASE_ANON_KEY | (igual ao .env.local) |
 | SUPABASE_SERVICE_ROLE_KEY | (igual ao .env.local) |
 | DATABASE_URL | (igual ao .env.local) |
