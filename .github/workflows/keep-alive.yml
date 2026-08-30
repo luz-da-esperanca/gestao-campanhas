@@ -1,0 +1,137 @@
+name: Keep-alive do Supabase
+
+# =============================================================================
+# POR QUE ESTE WORKFLOW É SEPARADO DO BACKUP
+#
+# São duas proteções diferentes contra dois problemas diferentes. Se
+# morassem no mesmo workflow, uma falha derrubaria as duas ao mesmo tempo —
+# e a gente só descobriria com o sistema fora do ar durante uma campanha.
+# Por isso eles usam credenciais diferentes: o backup usa DATABASE_URL,
+# este aqui usa só a publishable key, que já é pública por natureza.
+#
+# O QUE PRECISA ESTAR CADASTRADO (exige admin)
+#
+#   Settings -> Secrets and variables -> Actions -> aba "Variables":
+#     SUPABASE_URL               https://SEU-PROJECT-REF.supabase.co
+#     SUPABASE_PUBLISHABLE_KEY   a chave sb_publishable_... (é pública: vai
+#                                no bundle do navegador de qualquer jeito,
+#                                por isso Variable e não Secret)
+#
+#   Aba "Secrets":
+#     HEALTHCHECK_KEEPALIVE_URL  ping URL do check "keep-alive" no
+#                                healthchecks.io (opcional, mas é o alarme)
+# =============================================================================
+
+on:
+  schedule:
+    # Diário, às 07:00 UTC. O Supabase free pausa o projeto com 7 dias de
+    # inatividade; rodar todo dia dá 6 dias de folga para alguém consertar
+    # se este workflow parar.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  consultar-o-banco:
+    name: Consulta real ao PostgREST
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Exigir a configuração
+        env:
+          URL: ${{ vars.SUPABASE_URL }}
+          KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          faltando=""
+          [ -z "${URL:-}" ] && faltando="${faltando} SUPABASE_URL"
+          [ -z "${KEY:-}" ] && faltando="${faltando} SUPABASE_PUBLISHABLE_KEY"
+          if [ -n "$faltando" ]; then
+            echo "::error::Variables não cadastradas:${faltando}"
+            exit 1
+          fi
+
+      # Consulta de verdade, que chega no Postgres. Requisição a arquivo
+      # estático pode ser servida pela borda sem tocar no banco, e aí não
+      # conta como atividade — o projeto pausaria mesmo com o workflow verde.
+      #
+      # Com RLS negando por padrão, a resposta vem [] em vez de linhas. Isso
+      # é esperado e não invalida o keep-alive: o PostgREST executou SQL no
+      # Postgres para descobrir que não há nada a devolver. Se o projeto
+      # estiver pausado, a requisição não chega a 200 e o job falha.
+      - name: SELECT em campanhas via PostgREST
+        env:
+          URL: ${{ vars.SUPABASE_URL }}
+          KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          resposta="$(curl -sS -m 25 --retry 2 --retry-delay 5 \
+            -w '\n%{http_code}' \
+            -H "apikey: ${KEY}" \
+            -H "Authorization: Bearer ${KEY}" \
+            "${URL}/rest/v1/campanhas?select=id&limit=1")"
+
+          codigo="$(printf '%s' "$resposta" | tail -1)"
+          corpo="$(printf '%s' "$resposta" | sed '$d')"
+
+          echo "HTTP ${codigo}"
+          echo "corpo: ${corpo}"
+
+          if [ "$codigo" != "200" ]; then
+            echo "::error::PostgREST respondeu ${codigo}. Projeto pausado, chave inválida ou URL errada."
+            exit 1
+          fi
+          # Confirma que veio um array JSON, ou seja, que o PostgREST
+          # realmente consultou o banco em vez de devolver uma página de erro.
+          if ! printf '%s' "$corpo" | grep -qE '^\s*\['; then
+            echo "::error::Resposta 200 mas o corpo não é um array JSON. Não houve consulta ao banco."
+            exit 1
+          fi
+          echo "banco respondeu — projeto ativo"
+
+      - name: Avisar o healthchecks que deu certo
+        if: ${{ success() && secrets.HEALTHCHECK_KEEPALIVE_URL != '' }}
+        env:
+          HC: ${{ secrets.HEALTHCHECK_KEEPALIVE_URL }}
+        run: curl -fsS -m 10 --retry 3 "${HC}"
+
+      - name: Avisar o healthchecks que falhou
+        if: ${{ failure() && secrets.HEALTHCHECK_KEEPALIVE_URL != '' }}
+        env:
+          HC: ${{ secrets.HEALTHCHECK_KEEPALIVE_URL }}
+        run: curl -fsS -m 10 --retry 3 "${HC}/fail" || true
+
+      - name: Abrir ou atualizar Issue em caso de falha
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create keep-alive-falhou --color D93F0B \
+            --description "Keep-alive do Supabase falhou" 2>/dev/null || true
+
+          corpo="O keep-alive falhou em $(date -u '+%Y-%m-%d %H:%M UTC').
+
+Run: ${RUN_URL}
+
+Se isso ficar sem conserto, o projeto Supabase pausa por inatividade e o
+site sai do ar. O plano free não tem API para despausar: alguém precisa
+entrar no painel do Supabase e reativar na mão."
+
+          existente="$(gh issue list --state open --label keep-alive-falhou \
+                        --json number --jq '.[0].number // empty')"
+          if [ -n "$existente" ]; then
+            gh issue comment "$existente" --body "$corpo"
+          else
+            gh issue create --title "Keep-alive do Supabase falhou" \
+              --label keep-alive-falhou --body "$corpo"
+          fi
