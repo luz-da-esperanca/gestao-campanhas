@@ -78,7 +78,7 @@ async function main() {
   console.log(`✓ Admin criado: ${email}`);
   console.log(`  Use a senha definida em SEED_ADMIN_PASSWORD no .env.local`);
   console.log(`\n  Nota: o seed usa a API do Supabase (não precisa de DATABASE_URL).`);
-  console.log(`  Para o site rodar páginas admin, ainda configure DATABASE_URL com Session pooler.`);
+  console.log(`  O site em produção também não usa DATABASE_URL: nada em src/ importa o Prisma.`);
 }
 
 main().catch((e) => {

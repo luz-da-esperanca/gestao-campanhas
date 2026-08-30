@@ -22,7 +22,7 @@ const pool = new Pool({ connectionString: url, connectionTimeoutMillis: 15000 })
 pool
   .query("SELECT 1")
   .then(() => {
-    console.log("✓ Conexão Postgres OK — o app admin deve funcionar.");
+    console.log("✓ Conexão Postgres OK — dá para rodar check:env e prisma generate.");
     process.exit(0);
   })
   .catch((e) => {

@@ -72,7 +72,7 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
 DATABASE_URL=postgresql://postgres.SEU-PROJECT-REF:sua-senha-do-banco@....pooler.supabase.com:5432/postgres
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 SEED_ADMIN_EMAIL=admin@luzespe.local
-SEED_ADMIN_PASSWORD=change-me-123456
+SEED_ADMIN_PASSWORD=troque-esta-senha
 SEED_ADMIN_NAME=Administrador
 ```
 
@@ -100,7 +100,7 @@ npm run dev
 Abra http://localhost:3000 e entre com:
 
 - E-mail: o que está em `SEED_ADMIN_EMAIL` (ex: admin@luzespe.local)  
-- Senha: o que está em `SEED_ADMIN_PASSWORD` (ex: change-me-123456)  
+- Senha: a que você escolheu em `SEED_ADMIN_PASSWORD`  
 
 ---
 
