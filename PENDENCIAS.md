@@ -60,21 +60,30 @@ workflow escreve no banco (precisaria da service_role no CI) ou em outro lugar.
 - Contexto confirmado pelo usuário: não há API/CLI para despausar o Supabase;
   90 dias pausado = perde restore de 1 clique; 1 ano = projeto removido.
 
-## Para a TAREFA 7 (check:env) — APROVADO pelo usuário, fazer junto num único diff
+## TAREFA 7 — ENCERRADA em 2026-08-30
 
-Além do que a Tarefa 7 já prevê (checklist de variáveis), acrescentar a
-scripts/check-env.ts uma verificação de SCHEMA:
+DEPLOY-VARIAVEIS.md criado e check:env reescrito, no mesmo diff como combinado.
 
-  - Consultar o tipo das colunas de instante e FALHAR se alguma ainda for
-    `timestamp without time zone` -> significa banco sem a migration
-    20260828020000_timestamptz_instantes.sql.
-  - Mensagem sugerida: "[FALHA] banco sem a migration 20260828020000 —
-    rode `supabase db push`. Datas serão exibidas erradas em dev."
-  - Motivo (decidido na Tarefa 3.6): console.warn em Server Component morre no
-    log do Netlify; o check:env pega a divergência no momento em que ela nasce,
-    que é a configuração do ambiente. Sem overhead em runtime.
-  - Usuário pediu explicitamente para NÃO tocar check-env.ts duas vezes:
-    fazer isto e o checklist de variáveis no MESMO diff.
+Achados que não estavam previstos:
+
+1. **NEXT_PUBLIC_APP_URL tem fallback silencioso** para localhost:3000
+   (src/lib/constants.ts:7) e alimenta getConsultaUrl(), que monta a URL de
+   DENTRO do QR code. Sem ela em produção, todo QR aponta para localhost e o
+   erro só aparece na chamada, no domingo, durante a campanha.
+
+2. **Duas mensagens do próprio projeto afirmavam algo falso**: prisma/seed.ts
+   mandava configurar DATABASE_URL "para o site rodar páginas admin", e
+   test-db-connection.ts dizia "o app admin deve funcionar". Nada em src/
+   importa o Prisma. As duas empurravam a senha do banco para produção sem
+   necessidade. Corrigidas.
+
+3. **A DATABASE_URL do .env.local usa a conexão Direct**, que só resolve em
+   IPv6 — por isso a checagem de schema não conseguiu conectar daqui. O
+   check:env agora reconhece ENETUNREACH e sugere o Session pooler.
+
+4. A primeira versão da regra de senha recusava "Senha@Forte2026", uma senha
+   legítima, por casar com /^senha/i. Reescrita: prefixos só para placeholders
+   de documentação, e lista de senhas fracas comparada pela string inteira.
 
 ## PROJETO MORTO clgvsxgbivqgmvmehegm — ENCERRADO em 2026-08-30
 
