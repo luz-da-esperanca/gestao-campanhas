@@ -36,6 +36,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # O contexto 'secrets' NÃO é permitido dentro de 'if:' de um step; 'env'
+    # é. Por isso o ping URL é mapeado para env aqui no nível do job: assim
+    # os steps conseguem testar se ele foi cadastrado.
+    env:
+      HC: ${{ secrets.HEALTHCHECK_BACKUP_URL }}
+
     steps:
       # Falhar alto e cedo: sem o secret, não adianta seguir e produzir um
       # arquivo vazio que passa despercebido.
@@ -52,9 +58,7 @@ jobs:
           echo "secret presente (${#DATABASE_URL} caracteres)"
 
       - name: Avisar o healthchecks que o backup começou
-        if: ${{ secrets.HEALTHCHECK_BACKUP_URL != '' }}
-        env:
-          HC: ${{ secrets.HEALTHCHECK_BACKUP_URL }}
+        if: ${{ env.HC != '' }}
         run: curl -fsS -m 10 --retry 3 "${HC}/start" || true
 
       # O banco remoto roda PostgreSQL 17. pg_dump mais antigo que o servidor
@@ -129,15 +133,11 @@ jobs:
           if-no-files-found: error
 
       - name: Avisar o healthchecks que deu certo
-        if: ${{ success() && secrets.HEALTHCHECK_BACKUP_URL != '' }}
-        env:
-          HC: ${{ secrets.HEALTHCHECK_BACKUP_URL }}
+        if: ${{ success() && env.HC != '' }}
         run: curl -fsS -m 10 --retry 3 "${HC}"
 
       - name: Avisar o healthchecks que falhou
-        if: ${{ failure() && secrets.HEALTHCHECK_BACKUP_URL != '' }}
-        env:
-          HC: ${{ secrets.HEALTHCHECK_BACKUP_URL }}
+        if: ${{ failure() && env.HC != '' }}
         run: curl -fsS -m 10 --retry 3 "${HC}/fail" || true
 
       # Camada 2: Issue notifica todos os watchers do repositório e fica
@@ -153,13 +153,17 @@ jobs:
           gh label create backup-falhou --color B60205 \
             --description "Backup automático do banco falhou" 2>/dev/null || true
 
-          corpo="O backup automático falhou em $(date -u '+%Y-%m-%d %H:%M UTC').
-
-Run: ${RUN_URL}
-
-Enquanto isso não for resolvido, não há backup novo do banco.
-Causas mais comuns: senha do banco trocada sem atualizar o secret
-DATABASE_URL, ou projeto Supabase pausado."
+          # printf em vez de string multilinha crua: dentro de um bloco
+          # 'run: |' toda linha precisa manter a indentação, senão o YAML
+          # não fecha o bloco e o workflow inteiro fica inválido.
+          corpo="$(printf '%s\n' \
+            "O backup automático falhou em $(date -u '+%Y-%m-%d %H:%M UTC')." \
+            "" \
+            "Run: ${RUN_URL}" \
+            "" \
+            "Enquanto isso não for resolvido, não há backup novo do banco." \
+            "Causas mais comuns: a senha do banco foi trocada sem atualizar o" \
+            "secret DATABASE_URL, ou o projeto Supabase está pausado.")"
 
           existente="$(gh issue list --state open --label backup-falhou \
                         --json number --jq '.[0].number // empty')"

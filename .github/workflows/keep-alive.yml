@@ -44,6 +44,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
+    # 'secrets' não pode ser usado em 'if:' de step, 'env' pode.
+    env:
+      HC: ${{ secrets.HEALTHCHECK_KEEPALIVE_URL }}
+
     steps:
       - name: Exigir a configuração
         env:
@@ -98,15 +102,11 @@ jobs:
           echo "banco respondeu — projeto ativo"
 
       - name: Avisar o healthchecks que deu certo
-        if: ${{ success() && secrets.HEALTHCHECK_KEEPALIVE_URL != '' }}
-        env:
-          HC: ${{ secrets.HEALTHCHECK_KEEPALIVE_URL }}
+        if: ${{ success() && env.HC != '' }}
         run: curl -fsS -m 10 --retry 3 "${HC}"
 
       - name: Avisar o healthchecks que falhou
-        if: ${{ failure() && secrets.HEALTHCHECK_KEEPALIVE_URL != '' }}
-        env:
-          HC: ${{ secrets.HEALTHCHECK_KEEPALIVE_URL }}
+        if: ${{ failure() && env.HC != '' }}
         run: curl -fsS -m 10 --retry 3 "${HC}/fail" || true
 
       - name: Abrir ou atualizar Issue em caso de falha
@@ -119,13 +119,14 @@ jobs:
           gh label create keep-alive-falhou --color D93F0B \
             --description "Keep-alive do Supabase falhou" 2>/dev/null || true
 
-          corpo="O keep-alive falhou em $(date -u '+%Y-%m-%d %H:%M UTC').
-
-Run: ${RUN_URL}
-
-Se isso ficar sem conserto, o projeto Supabase pausa por inatividade e o
-site sai do ar. O plano free não tem API para despausar: alguém precisa
-entrar no painel do Supabase e reativar na mão."
+          corpo="$(printf '%s\n' \
+            "O keep-alive falhou em $(date -u '+%Y-%m-%d %H:%M UTC')." \
+            "" \
+            "Run: ${RUN_URL}" \
+            "" \
+            "Se ficar sem conserto, o projeto Supabase pausa por inatividade e o" \
+            "site sai do ar. O plano free não tem API para despausar: alguém" \
+            "precisa entrar no painel do Supabase e reativar na mão.")"
 
           existente="$(gh issue list --state open --label keep-alive-falhou \
                         --json number --jq '.[0].number // empty')"
