@@ -113,6 +113,10 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+          # Sem checkout não existe repositório git no runner, e o gh não
+          # consegue inferir em qual repo agir. GH_REPO resolve sem precisar
+          # baixar o código só para abrir uma Issue.
+          GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
