@@ -29,6 +29,24 @@ Tudo o que estava listado aqui foi feito. Registro do que mudou:
    uma senha real de alguém. Trocada por texto genérico, a pedido do usuário,
    que ficou de falar com quem passou o projeto.
 
+## CAMADA 4 do alarme — card de último backup no /admin (adiado)
+
+Decidido em 2026-08-30: fica para depois, é mudança de aplicação e o usuário
+não quis ampliar o escopo da Tarefa 6.
+
+O problema que ela resolve: as camadas 1 a 3 (dead-man's switch externo, Issue
+em falha, workflows separados) avisam por e-mail e pela aba Issues. A equipe da
+instituição não abre nenhum dos dois no dia a dia — abre o /admin.
+
+Forma sugerida:
+  - o workflow de backup grava data/hora do último sucesso em algum lugar
+    legível pela aplicação (tabela própria, ou Supabase Storage)
+  - o /admin mostra um card "último backup: há N dias", vermelho acima de 2
+  - mesma ideia serve para o keep-alive
+
+Custo: uma tabela nova + uma migration + um card. Depende de decidir se o
+workflow escreve no banco (precisaria da service_role no CI) ou em outro lugar.
+
 ## Para a TAREFA 4 (deploy-producao.sql)
 - Cabeçalho deve avisar: migrations init/rls/presenca NÃO são idempotentes;
   script interrompido no meio não pode ser simplesmente recolado.
