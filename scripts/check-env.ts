@@ -99,10 +99,44 @@ if (!dbUrl) {
   add("DATABASE_URL (opcional)", "OK");
 }
 
+/*
+ * O e-mail do admin não é decoração: é o login de produção e o endereço para
+ * onde a recuperação de senha é enviada. Um domínio de exemplo aqui significa
+ * uma caixa que ninguém abre — e quem perder a senha perde o acesso.
+ *
+ * Recusar senha placeholder e aprovar e-mail placeholder era meio caminho: a
+ * validação de formato abaixo aprovava "admin@exemplo.com" sem reclamar.
+ */
+// Domínios de documentação. Comparação exata, não por substring: "exemplo.com"
+// é placeholder, mas um "meuexemplo.com.br" pode ser o domínio real de alguém.
+const DOMINIOS_EXEMPLO = new Set([
+  "exemplo.com", "exemplo.com.br", "exemplo.org", "exemplo.net",
+  "example.com", "example.net", "example.org", "example.edu",
+  "test.com", "teste.com", "dominio.com", "dominio.com.br",
+  "meudominio.com", "seudominio.com", "seu-dominio.com",
+  "mydomain.com", "yourdomain.com", "acme.com", "foo.com", "bar.com",
+]);
+// TLDs que nunca entregam e-mail vindo de fora: os reservados pela RFC 2606
+// (.test, .example, .invalid, .localhost) e .local, do mDNS. São legítimos em
+// desenvolvimento, então viram AVISO e não FALTA — mas em produção significam
+// que o "esqueci minha senha" do admin não chega a lugar nenhum.
+const TLDS_NAO_ENTREGAVEIS = [".local", ".localhost", ".invalid", ".test", ".example"];
+
 const email = process.env.SEED_ADMIN_EMAIL?.trim();
-if (!email) add("SEED_ADMIN_EMAIL", "FALTA", "você escolhe (ex: admin@luzespe.local)");
-else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) add("SEED_ADMIN_EMAIL", "FALTA", `não parece um e-mail: ${email}`);
-else add("SEED_ADMIN_EMAIL", "OK");
+const dominioEmail = email?.split("@").pop()?.toLowerCase() ?? "";
+if (!email) {
+  add("SEED_ADMIN_EMAIL", "FALTA", "você escolhe — use um endereço real da instituição");
+} else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+  add("SEED_ADMIN_EMAIL", "FALTA", `não parece um e-mail: ${email}`);
+} else if (DOMINIOS_EXEMPLO.has(dominioEmail)) {
+  add("SEED_ADMIN_EMAIL", "FALTA",
+    `"${dominioEmail}" é domínio de exemplo — este endereço é o login do admin e o destino da recuperação de senha`);
+} else if (TLDS_NAO_ENTREGAVEIS.some((t) => dominioEmail.endsWith(t))) {
+  add("SEED_ADMIN_EMAIL", "AVISO",
+    `"${dominioEmail}" não recebe e-mail de fora — serve para desenvolvimento, não para produção`);
+} else {
+  add("SEED_ADMIN_EMAIL", "OK");
+}
 
 /*
  * O seed cria um login de administrador de verdade. Uma senha de exemplo que
