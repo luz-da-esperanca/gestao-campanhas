@@ -1,16 +1,27 @@
 # https://supabase.com/docs/guides/deployment/branching/github-integration
 # Working directory na integração GitHub: raiz do repositório (.) — NÃO use "supabase" sozinho
 
-# O projeto anterior (clgvsxgbivqgmvmehegm) não existe mais — foi descontinuado.
-# Confirmado em 2026-08-28 via `supabase projects list`: a conta enxerga apenas
-# o projeto abaixo.
-project_id = "kqeavgvlqshmdawrsyaj"
+# PRODUÇÃO. Este é o projeto que a integração GitHub e um `supabase db push` sem
+# --project-ref vão atingir. Trocar aqui é trocar o alvo de deploy do schema.
+#
+# Histórico dos refs, para quem for procurar nos commits:
+#   clgvsxgbivqgmvmehegm  descontinuado, não existe mais
+#   kqeavgvlqshmdawrsyaj  desenvolvimento/teste — as 9 migrations foram ensaiadas
+#                         nele em 2026-08-30 antes de irem para produção
+#   scgznnxovkbaaqfpckvp  PRODUÇÃO, criado em 2026-08-30, região sa-east-1
+#
+# Atenção: `supabase link` NÃO reescreve este arquivo. Ele grava o ref em
+# supabase/.temp/project-ref, que é ignorado pelo git. Ou seja: este valor pode
+# divergir do link ativo na sua máquina sem nenhum aviso. Foi o que aconteceu em
+# 2026-08-30 — o link apontava para produção e este arquivo ainda dizia teste.
+# Confira com:  cat supabase/.temp/project-ref
+project_id = "scgznnxovkbaaqfpckvp"
 
 [api]
 enabled = true
 port = 54321
 
 [db]
-# 17 confirmado via `supabase projects list` em 2026-08-28: o projeto remoto
-# roda PostgreSQL 17.6.1 (engine 17). Estava 15, herdado do schema.prisma.
+# 17 confirmado via `supabase projects list`: teste e produção rodam ambos
+# PostgreSQL 17.6.1 (engine 17). Estava 15, herdado do schema.prisma.
 major_version = 17
