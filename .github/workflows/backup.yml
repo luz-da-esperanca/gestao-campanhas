@@ -137,11 +137,35 @@ jobs:
           # Confere também que o gzip não está corrompido e que o conteúdo
           # parece mesmo um dump.
           gzip -t "$ARQUIVO"
-          if ! zcat "$ARQUIVO" | head -40 | grep -q "PostgreSQL database dump"; then
+
+          # NÃO usar `zcat ... | head -40 | grep` aqui: com `set -o pipefail`,
+          # o head fecha o cano assim que junta 40 linhas, o zcat leva SIGPIPE
+          # e sai != 0 — e o pipeline inteiro é considerado falho mesmo quando
+          # o grep encontrou o texto. Medido em 2026-08-31: um dump válido de
+          # 12 KB foi recusado, com "gzip: stdout: Broken pipe" no log.
+          # Descomprimir para arquivo elimina o SIGPIPE. O dump é pequeno.
+          zcat "$ARQUIVO" > /tmp/dump-verificacao.sql
+          linhas="$(wc -l < /tmp/dump-verificacao.sql)"
+          echo "descomprimido: ${linhas} linhas"
+          if ! head -40 /tmp/dump-verificacao.sql | grep -q "PostgreSQL database dump"; then
             echo "::error::O arquivo não parece um dump do PostgreSQL."
+            echo "Primeiras 5 linhas do que veio:"
+            head -5 /tmp/dump-verificacao.sql
             exit 1
           fi
-          echo "dump íntegro"
+
+          # Um dump só de estrutura, sem os objetos que esperamos, também é
+          # inútil. Confere que as tabelas do sistema estão lá.
+          faltando=""
+          for t in users caravaneiros campanhas solicitacoes_caravaneiro; do
+            grep -q "CREATE TABLE public.${t}" /tmp/dump-verificacao.sql || faltando="${faltando} ${t}"
+          done
+          if [ -n "$faltando" ]; then
+            echo "::error::O dump não contém CREATE TABLE para:${faltando}"
+            exit 1
+          fi
+          echo "dump íntegro: as 4 tabelas conferidas estão presentes"
+          rm -f /tmp/dump-verificacao.sql
 
       - name: Guardar como artifact
         uses: actions/upload-artifact@v4
