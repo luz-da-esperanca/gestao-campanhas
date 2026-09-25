@@ -121,8 +121,8 @@ const campanhaSchema = z.object({
   nome: z.string().min(2, "Nome obrigatório"),
   tipo: z.enum(["DISTRIBUICAO", "COLETA", "ESPECIAL"]),
   descricao: z.string().optional(),
-  dataInicio: z.string().optional(),
-  dataFim: z.string().optional(),
+  dataInicio: z.iso.date("Data de início inválida").optional(),
+  dataFim: z.iso.date("Data de fim inválida").optional(),
 });
 
 export async function createCampanhaAction(formData: FormData) {
@@ -155,6 +155,9 @@ export async function createCampanhaAction(formData: FormData) {
   }
 
   revalidatePath("/admin/campanhas");
+  if (campanha.tipo === "DISTRIBUICAO") {
+    redirect(`/admin/campanhas/new?distribuicao=${encodeURIComponent(campanha.id)}`);
+  }
   redirect(`/admin/campanhas/${campanha.id}`);
 }
 
