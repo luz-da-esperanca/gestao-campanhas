@@ -20,6 +20,34 @@ export type RotaRow = {
   path: Array<{ lat: number; lng: number }>;
 };
 
+/** Rotas com percurso geográfico; cadastros simples não aparecem no mapa. */
+export async function listRotasMapa(): Promise<RotaRow[]> {
+  const campanhas = await listCampanhas();
+  const { data, error } = await getDb()
+    .from("rotas")
+    .select("id, nome, campanha_id, path")
+    .not("campanha_id", "is", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const rotas = (data ?? []).flatMap((rota) => {
+    const path = rota.path;
+    if (!Array.isArray(path) || path.length < 2 || !path.every((p) =>
+      p && Number.isFinite(p.lat) && Number.isFinite(p.lng) &&
+      Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180
+    )) return [];
+    return [{ id: rota.id, nome: rota.nome, campanhaId: rota.campanha_id, path }];
+  });
+  return campanhas.flatMap((campanha) => {
+    const origemId = campanha.distribuicaoId && !campanha.rotasPersonalizadas
+      ? campanha.distribuicaoId : campanha.id;
+    return rotas.filter((rota) => rota.campanhaId === origemId).map((rota) => ({
+      ...rota,
+      campanhaId: campanha.id,
+      nome: `${rota.nome} — ${campanha.nome}`,
+    }));
+  });
+}
+
 export type ItemCatalogoRow = {
   id: string;
   categoria: string;
