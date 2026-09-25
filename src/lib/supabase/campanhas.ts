@@ -9,6 +9,8 @@ export type CampanhaRow = {
   descricao: string | null;
   dataInicio: string | null;
   dataFim: string | null;
+  distribuicaoId: string | null;
+  rotasPersonalizadas: boolean;
 };
 
 export type RotaRow = {
@@ -45,6 +47,8 @@ function mapCampanha(row: Record<string, unknown>): CampanhaRow {
     descricao: (row.descricao as string) ?? null,
     dataInicio: (row.data_inicio as string) ?? null,
     dataFim: (row.data_fim as string) ?? null,
+    distribuicaoId: (row.distribuicao_id as string) ?? null,
+    rotasPersonalizadas: row.rotas_personalizadas === true,
   };
 }
 
@@ -84,6 +88,7 @@ export async function createCampanha(input: {
   descricao?: string;
   dataInicio?: string;
   dataFim?: string;
+  distribuicaoId?: string;
 }) {
   const { data, error } = await getDb()
     .from("campanhas")
@@ -94,6 +99,7 @@ export async function createCampanha(input: {
       data_inicio: input.dataInicio ?? null,
       data_fim: input.dataFim ?? null,
       status: "PLANEJADA",
+      ...(input.distribuicaoId ? { distribuicao_id: input.distribuicaoId } : {}),
     })
     .select("*")
     .single();
@@ -110,10 +116,14 @@ export async function updateCampanhaStatus(id: string, status: CampanhaStatus) {
 }
 
 export async function listRotasByCampanha(campanhaId: string): Promise<RotaRow[]> {
+  const campanha = await getCampanha(campanhaId);
+  if (!campanha) return [];
+  const origemId = campanha.distribuicaoId && !campanha.rotasPersonalizadas
+    ? campanha.distribuicaoId : campanhaId;
   const { data, error } = await getDb()
     .from("rotas")
     .select("*")
-    .eq("campanha_id", campanhaId)
+    .eq("campanha_id", origemId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((r) => ({
@@ -147,8 +157,15 @@ export async function saveRota(input: {
   };
 }
 
-export async function deleteRota(id: string) {
-  const { error } = await getDb().from("rotas").delete().eq("id", id);
+export async function deleteRota(id: string, campanhaId: string) {
+  const { data, error } = await getDb().from("rotas").delete()
+    .eq("id", id).eq("campanha_id", campanhaId).select("id");
+  if (error) throw error;
+  if (!data?.length) throw new Error("Rota não pertence a esta campanha");
+}
+
+export async function personalizarRotasColeta(campanhaId: string) {
+  const { error } = await getDb().rpc("personalizar_rotas_coleta", { p_campanha_id: campanhaId });
   if (error) throw error;
 }
 

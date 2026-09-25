@@ -14,6 +14,8 @@ import {
   deleteRota,
   saveRota,
   updateCampanhaStatus,
+  getCampanha,
+  personalizarRotasColeta,
 } from "@/lib/supabase/campanhas";
 import type { CampanhaStatus, CampanhaTipo } from "@/lib/auth/types";
 
@@ -123,6 +125,7 @@ const campanhaSchema = z.object({
   descricao: z.string().optional(),
   dataInicio: z.iso.date("Data de início inválida").optional(),
   dataFim: z.iso.date("Data de fim inválida").optional(),
+  distribuicaoId: z.uuid("Distribuição inválida").optional(),
 });
 
 export async function createCampanhaAction(formData: FormData) {
@@ -134,6 +137,7 @@ export async function createCampanhaAction(formData: FormData) {
     descricao: formData.get("descricao")?.toString() || undefined,
     dataInicio: formData.get("dataInicio")?.toString() || undefined,
     dataFim: formData.get("dataFim")?.toString() || undefined,
+    distribuicaoId: formData.get("distribuicaoId")?.toString() || undefined,
   });
 
   if (!parsed.success) {
@@ -142,12 +146,19 @@ export async function createCampanhaAction(formData: FormData) {
 
   let campanha;
   try {
+    if (parsed.data.distribuicaoId) {
+      const origem = await getCampanha(parsed.data.distribuicaoId);
+      if (parsed.data.tipo !== "COLETA" || origem?.tipo !== "DISTRIBUICAO") {
+        return { error: "Selecione uma distribuição válida para a coleta" };
+      }
+    }
     campanha = await createCampanha({
       nome: parsed.data.nome,
       tipo: parsed.data.tipo as CampanhaTipo,
       descricao: parsed.data.descricao,
       dataInicio: parsed.data.dataInicio,
       dataFim: parsed.data.dataFim,
+      distribuicaoId: parsed.data.distribuicaoId,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao criar campanha";
@@ -200,8 +211,9 @@ export async function saveRotaAction(formData: FormData) {
   }
 
   try {
+    await requireRotasProprias(campanhaId);
     await saveRota({ campanhaId, nome, path });
-    revalidatePath(`/admin/campanhas/${campanhaId}`);
+    revalidarMapas();
     return { success: true };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao salvar rota";
@@ -213,12 +225,40 @@ export async function deleteRotaAction(rotaId: string, campanhaId: string) {
   await requireSessionUser(["admin"]);
 
   try {
-    await deleteRota(rotaId);
-    revalidatePath(`/admin/campanhas/${campanhaId}`);
+    await requireRotasProprias(campanhaId);
+    await deleteRota(rotaId, campanhaId);
+    revalidarMapas();
     return { success: true };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao excluir rota";
     return { error: message };
+  }
+}
+
+async function requireRotasProprias(campanhaId: string) {
+  const campanha = await getCampanha(campanhaId);
+  if (!campanha) throw new Error("Campanha não encontrada");
+  if (campanha.distribuicaoId && !campanha.rotasPersonalizadas) {
+    throw new Error("Personalize as rotas da coleta antes de alterá-las");
+  }
+}
+
+function revalidarMapas() {
+  revalidatePath("/admin");
+  revalidatePath("/admin/rotas");
+  revalidatePath("/admin/campanhas/[id]", "page");
+  revalidatePath("/campanhas/[id]", "page");
+}
+
+export async function personalizarRotasColetaAction(campanhaId: string) {
+  await requireSessionUser(["admin"]);
+  if (!z.uuid().safeParse(campanhaId).success) return { error: "Campanha inválida" };
+  try {
+    await personalizarRotasColeta(campanhaId);
+    revalidarMapas();
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Não foi possível personalizar as rotas" };
   }
 }
 

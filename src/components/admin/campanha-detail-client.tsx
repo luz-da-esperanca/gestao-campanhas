@@ -3,13 +3,18 @@
 import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   saveRotaAction,
   deleteRotaAction,
   updateCampanhaStatusAction,
   createArrecadacaoAction,
+  personalizarRotasColetaAction,
 } from "@/lib/auth/phase2-actions";
-import { RouteMapEditor } from "@/components/admin/route-map-editor";
+const RouteMapEditor = dynamic(
+  () => import("@/components/admin/route-map-editor").then((mod) => mod.RouteMapEditor),
+  { ssr: false, loading: () => <p role="status">Carregando mapa…</p> },
+);
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,6 +63,8 @@ type CampanhaDetailClientProps = {
     tipo: CampanhaTipo;
     status: CampanhaStatus;
     descricao: string | null;
+    distribuicaoId: string | null;
+    rotasPersonalizadas: boolean;
   };
   rotas: RotaRow[];
   catalogo: ItemCatalogoRow[];
@@ -98,6 +105,21 @@ export function CampanhaDetailClient({
 }: CampanhaDetailClientProps) {
   const router = useRouter();
   const [rotaPending, setRotaPending] = useState(false);
+  const sincronizandoRotas = Boolean(campanha.distribuicaoId && !campanha.rotasPersonalizadas);
+
+  const handlePersonalizarRotas = async () => {
+    setRotaPending(true);
+    try {
+      const result = await personalizarRotasColetaAction(campanha.id);
+      if (result.error) toast.error(result.error);
+      else {
+        toast.success("Rotas copiadas. Agora você pode alterar apenas o percurso da coleta.");
+        router.refresh();
+      }
+    } finally {
+      setRotaPending(false);
+    }
+  };
 
   const handleStatus = async (status: CampanhaStatus) => {
     const result = await updateCampanhaStatusAction(campanha.id, status);
@@ -258,11 +280,36 @@ export function CampanhaDetailClient({
               exportar qualquer rota salva para navegação no Google Maps.
             </p>
           </div>
+          {campanha.distribuicaoId && (
+            <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm">
+              <p>
+                {sincronizandoRotas
+                  ? "Esta coleta acompanha as rotas da distribuição. Novas rotas e alterações feitas lá aparecem aqui ao atualizar a página."
+                  : "Esta coleta usa rotas personalizadas. Alterações na distribuição não mudam mais este percurso."}
+              </p>
+              <Link href={`/admin/campanhas/${campanha.distribuicaoId}`} className="inline-block font-medium text-primary underline">
+                Abrir distribuição de origem
+              </Link>
+              {sincronizandoRotas && (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground">
+                    Ao personalizar, copiamos as rotas atuais e paramos de acompanhar a distribuição.
+                    {rotas.length === 0 && " Ainda não há rotas na distribuição; sua coleta começará sem percursos."}
+                  </p>
+                  <Button type="button" variant="outline" disabled={rotaPending} onClick={handlePersonalizarRotas}>
+                    {rotaPending ? "Copiando rotas..." : "Personalizar rotas da coleta"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           <RouteMapEditor
+            key={sincronizandoRotas ? "herdadas" : "proprias"}
             savedRotas={rotas}
             onSave={handleSaveRota}
             onDelete={handleDeleteRota}
             pending={rotaPending}
+            readOnly={sincronizandoRotas}
           />
         </section>
         </>

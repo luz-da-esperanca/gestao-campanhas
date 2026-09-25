@@ -39,6 +39,15 @@ export function CreateCampanhaForm({ arrecadacao }: {
       </CardHeader>
       <CardContent>
         <form action={formAction} className="flex flex-col gap-4">
+          {arrecadacao && (
+            <>
+              <input type="hidden" name="distribuicaoId" value={arrecadacao.distribuicaoId} />
+              <p className="text-sm text-muted-foreground">
+                A coleta acompanhará as rotas da distribuição, inclusive as desenhadas depois.
+                Você poderá personalizar as rotas da coleta quando precisar.
+              </p>
+            </>
+          )}
           {state?.error && (
             <Alert variant="destructive">
               <AlertDescription>{state.error}</AlertDescription>
