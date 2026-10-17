@@ -71,7 +71,7 @@
 --  reexecutadas isoladamente sem risco.
 --
 -- -----------------------------------------------------------------------------
---  CONTEÚDO (9 arquivos, na ordem de aplicação)
+--  CONTEÚDO (10 arquivos, na ordem de aplicação)
 -- -----------------------------------------------------------------------------
 --    1. 20260526150000_init.sql  (NÃO idempotente)
 --    2. 20260526160000_rls.sql  (NÃO idempotente)
@@ -82,6 +82,7 @@
 --    7. 20260828000000_rls_completo.sql
 --    8. 20260828010000_updated_at_triggers.sql
 --    9. 20260828020000_timestamptz_instantes.sql
+--   10. 20260925000000_rotas_coleta_vinculadas.sql
 --
 --  Gerado por scripts/gerar-deploy-sql.ts a partir de supabase/migrations/.
 -- =============================================================================
@@ -90,7 +91,7 @@
 
 
 -- =============================================================================
--- BLOCO 1/9
+-- BLOCO 1/10
 -- ORIGEM: supabase/migrations/20260526150000_init.sql
 -- sha256(12): 025de74385b5   |   NÃO idempotente — ver aviso no topo
 -- =============================================================================
@@ -165,7 +166,7 @@ ALTER TABLE "caravaneiros"
 
 
 -- =============================================================================
--- BLOCO 2/9
+-- BLOCO 2/10
 -- ORIGEM: supabase/migrations/20260526160000_rls.sql
 -- sha256(12): bbcae9235e07   |   NÃO idempotente — ver aviso no topo
 -- =============================================================================
@@ -205,7 +206,7 @@ CREATE POLICY caravaneiros_all_admin ON "caravaneiros"
 
 
 -- =============================================================================
--- BLOCO 3/9
+-- BLOCO 3/10
 -- ORIGEM: supabase/migrations/20260602000000_phase2.sql
 -- sha256(12): fa3222ae27c1   |   idempotente
 -- =============================================================================
@@ -283,7 +284,7 @@ END $$;
 
 
 -- =============================================================================
--- BLOCO 4/9
+-- BLOCO 4/10
 -- ORIGEM: supabase/migrations/20260603000000_guest_solicitacoes.sql
 -- sha256(12): b51e2ed90704   |   idempotente
 -- =============================================================================
@@ -311,7 +312,7 @@ CREATE INDEX IF NOT EXISTS "solicitacoes_caravaneiro_status_idx"
 
 
 -- =============================================================================
--- BLOCO 5/9
+-- BLOCO 5/10
 -- ORIGEM: supabase/migrations/20260604000000_presenca.sql
 -- sha256(12): a1be43d00c62   |   NÃO idempotente — ver aviso no topo
 -- =============================================================================
@@ -342,7 +343,7 @@ CREATE INDEX IF NOT EXISTS "campanha_participantes_campanha_idx"
 
 
 -- =============================================================================
--- BLOCO 6/9
+-- BLOCO 6/10
 -- ORIGEM: supabase/migrations/20260605000000_cadastros_basicos.sql
 -- sha256(12): 4e4a616007c0   |   idempotente
 -- =============================================================================
@@ -372,7 +373,7 @@ ALTER TABLE "arrecadacoes"
 
 
 -- =============================================================================
--- BLOCO 7/9
+-- BLOCO 7/10
 -- ORIGEM: supabase/migrations/20260828000000_rls_completo.sql
 -- sha256(12): 1f8e1feff34b   |   idempotente
 -- =============================================================================
@@ -426,7 +427,7 @@ DROP POLICY IF EXISTS users_update_own ON "users";
 
 
 -- =============================================================================
--- BLOCO 8/9
+-- BLOCO 8/10
 -- ORIGEM: supabase/migrations/20260828010000_updated_at_triggers.sql
 -- sha256(12): 277a1a2f17ca   |   idempotente
 -- =============================================================================
@@ -506,7 +507,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON "tarefas"
 
 
 -- =============================================================================
--- BLOCO 9/9
+-- BLOCO 9/10
 -- ORIGEM: supabase/migrations/20260828020000_timestamptz_instantes.sql
 -- sha256(12): 91a761b63d00   |   idempotente
 -- =============================================================================
@@ -613,7 +614,96 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON "tarefas"
 
 
 -- =============================================================================
--- FIM — 9 blocos aplicados.
+-- BLOCO 10/10
+-- ORIGEM: supabase/migrations/20260925000000_rotas_coleta_vinculadas.sql
+-- sha256(12): 9b485d8fc13c   |   idempotente
+-- =============================================================================
+
+-- A coleta acompanha as rotas da distribuição até personalizar uma cópia.
+-- Não associa campanhas antigas por nome ou data.
+ALTER TABLE public.campanhas
+  ADD COLUMN IF NOT EXISTS distribuicao_id uuid REFERENCES public.campanhas(id) ON DELETE RESTRICT,
+  ADD COLUMN IF NOT EXISTS rotas_personalizadas boolean NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS campanhas_distribuicao_id_idx ON public.campanhas(distribuicao_id);
+
+CREATE OR REPLACE FUNCTION public.validar_distribuicao_coleta()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  IF NEW.distribuicao_id IS NOT NULL THEN
+    IF NEW.tipo <> 'COLETA' OR NEW.distribuicao_id = NEW.id THEN
+      RAISE EXCEPTION 'Somente uma coleta pode acompanhar uma distribuição';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.campanhas WHERE id = NEW.distribuicao_id AND tipo = 'DISTRIBUICAO') THEN
+      RAISE EXCEPTION 'Campanha de distribuição não encontrada';
+    END IF;
+  END IF;
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.tipo <> OLD.tipo AND EXISTS (SELECT 1 FROM public.campanhas WHERE distribuicao_id = OLD.id) THEN
+      RAISE EXCEPTION 'Esta distribuição possui coletas vinculadas';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS validar_distribuicao_coleta ON public.campanhas;
+CREATE TRIGGER validar_distribuicao_coleta
+BEFORE INSERT OR UPDATE ON public.campanhas
+FOR EACH ROW EXECUTE FUNCTION public.validar_distribuicao_coleta();
+
+CREATE OR REPLACE FUNCTION public.proteger_rotas_herdadas()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+DECLARE
+  campanha public.campanhas%ROWTYPE;
+  campanha_id uuid;
+BEGIN
+  IF TG_OP = 'DELETE' THEN campanha_id := OLD.campanha_id;
+  ELSE campanha_id := NEW.campanha_id;
+  END IF;
+  IF TG_OP = 'UPDATE' AND NEW.campanha_id IS DISTINCT FROM OLD.campanha_id THEN
+    RAISE EXCEPTION 'Uma rota não pode ser transferida entre campanhas';
+  END IF;
+  SELECT * INTO campanha FROM public.campanhas WHERE id = campanha_id FOR UPDATE;
+  IF campanha.distribuicao_id IS NOT NULL AND NOT campanha.rotas_personalizadas THEN
+    RAISE EXCEPTION 'Personalize as rotas da coleta antes de alterá-las';
+  END IF;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS proteger_rotas_herdadas ON public.rotas;
+CREATE TRIGGER proteger_rotas_herdadas
+BEFORE INSERT OR UPDATE OR DELETE ON public.rotas
+FOR EACH ROW EXECUTE FUNCTION public.proteger_rotas_herdadas();
+
+-- A cópia e o desligamento da sincronização são uma única transação.
+-- O bloqueio da coleta também impede cópias duplicadas em cliques concorrentes.
+CREATE OR REPLACE FUNCTION public.personalizar_rotas_coleta(p_campanha_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog AS $$
+DECLARE
+  coleta public.campanhas%ROWTYPE;
+BEGIN
+  SELECT * INTO coleta FROM public.campanhas WHERE id = p_campanha_id FOR UPDATE;
+  IF NOT FOUND OR coleta.tipo <> 'COLETA' OR coleta.distribuicao_id IS NULL THEN
+    RAISE EXCEPTION 'Coleta vinculada não encontrada';
+  END IF;
+  IF coleta.rotas_personalizadas THEN RETURN; END IF;
+  UPDATE public.campanhas SET rotas_personalizadas = true WHERE id = coleta.id;
+  INSERT INTO public.rotas (campanha_id, nome, path, bairro, responsavel)
+    SELECT coleta.id, nome, path, bairro, responsavel
+    FROM public.rotas WHERE campanha_id = coleta.distribuicao_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.personalizar_rotas_coleta(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.personalizar_rotas_coleta(uuid) TO service_role;
+NOTIFY pgrst, 'reload schema';
+
+
+-- =============================================================================
+-- FIM — 10 blocos aplicados.
 -- Confira no painel: Table Editor deve listar 10 tabelas, e
 -- Authentication > Policies deve mostrar RLS habilitado em todas elas.
 -- =============================================================================

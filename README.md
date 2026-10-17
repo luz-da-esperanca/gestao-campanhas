@@ -99,6 +99,29 @@ o mesmo banco, com o risco de divergirem outra vez.
 - **Arrecadações:** após encerrar campanha
 - **Solicitações:** formulário público → admin aprova e cria login
 
+### Distribuição e coleta com as mesmas rotas
+
+Ao confirmar a coleta sugerida após cadastrar uma distribuição, as campanhas
+ficam vinculadas. A coleta mostra as rotas da distribuição, incluindo percursos
+criados ou alterados depois do agendamento. Atualize a página para visualizar
+alterações feitas em outra aba. A data da coleta continua independente.
+
+Em **Rotas e mapa**, o botão **Personalizar rotas da coleta** copia os percursos
+atuais e encerra a sincronização. A partir daí, adições e exclusões na coleta
+não alteram a distribuição, e vice-versa. Personalizar sem rotas cria uma
+coleta com percurso próprio vazio. Repetir a operação não duplica as rotas.
+
+Campanhas criadas antes desse recurso não são associadas automaticamente.
+O vínculo exige a migration `20260925000000_rotas_coleta_vinculadas.sql`.
+A função de cópia só pode ser chamada pelo servidor, após autenticar um admin.
+
+Teste de integração (usa `DATABASE_URL`, aplica a migration e cria registros
+dentro de uma transação sempre revertida):
+
+```bash
+node --import tsx scripts/test-rotas-vinculadas.ts
+```
+
 ## Netlify
 
 Quatro variáveis: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`

@@ -45,6 +45,8 @@ export const getDashboardStats = cache(async () => {
     ativos,
     solicitacoes,
     campanhasAtivas,
+    campanhasPlanejadas,
+    campanhasEncerradas,
     campanhas,
     tarefas,
     doacoes,
@@ -57,6 +59,8 @@ export const getDashboardStats = cache(async () => {
       .select("*", { count: "exact", head: true })
       .eq("status", "PENDENTE"),
     sb.from("campanhas").select("*", { count: "exact", head: true }).eq("status", "ATIVA"),
+    sb.from("campanhas").select("*", { count: "exact", head: true }).eq("status", "PLANEJADA"),
+    sb.from("campanhas").select("*", { count: "exact", head: true }).eq("status", "ENCERRADA"),
     sb.from("campanhas").select("*", { count: "exact", head: true }),
     sb.from("tarefas").select("*", { count: "exact", head: true }),
     sb.from("arrecadacoes").select("*", { count: "exact", head: true }),
@@ -67,6 +71,8 @@ export const getDashboardStats = cache(async () => {
   if (ativos.error) throw ativos.error;
   if (solicitacoes.error) throw solicitacoes.error;
   if (campanhasAtivas.error) throw campanhasAtivas.error;
+  if (campanhasPlanejadas.error) throw campanhasPlanejadas.error;
+  if (campanhasEncerradas.error) throw campanhasEncerradas.error;
   if (campanhas.error) throw campanhas.error;
   if (tarefas.error) throw tarefas.error;
   if (doacoes.error) throw doacoes.error;
@@ -77,6 +83,8 @@ export const getDashboardStats = cache(async () => {
     ativosCount: ativos.count ?? 0,
     solicitacoesPendentesCount: solicitacoes.count ?? 0,
     campanhasAtivasCount: campanhasAtivas.count ?? 0,
+    campanhasPlanejadasCount: campanhasPlanejadas.count ?? 0,
+    campanhasEncerradasCount: campanhasEncerradas.count ?? 0,
     campanhasCount: campanhas.count ?? 0,
     tarefasCount: tarefas.count ?? 0,
     doacoesCount: doacoes.count ?? 0,
@@ -92,6 +100,51 @@ export async function listAdmins(): Promise<AdminRow[]> {
 
   if (error) throw error;
   return data ?? [];
+}
+
+export type DoacaoRecente = {
+  id: string;
+  item: string;
+  quantidade: number | null;
+  doador: string | null;
+  createdAt: string;
+  campanhaId: string | null;
+};
+
+export async function getDashboardActivity() {
+  const sb = getDb();
+  const [pendentes, andamento, concluidas, doacoes] = await Promise.all([
+    sb.from("tarefas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
+    sb.from("tarefas").select("id", { count: "exact", head: true }).eq("status", "andamento"),
+    sb.from("tarefas").select("id", { count: "exact", head: true }).eq("status", "concluida"),
+    sb.from("arrecadacoes")
+      .select("id,item,quantidade,doador,created_at,campanha_id,descricao_outros,item_catalogo(nome,tamanho)")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(5),
+  ]);
+  for (const result of [pendentes, andamento, concluidas, doacoes]) {
+    if (result.error) throw result.error;
+  }
+  const recentes: DoacaoRecente[] = (doacoes.data ?? []).map((doacao) => {
+    const catalogo = Array.isArray(doacao.item_catalogo)
+      ? doacao.item_catalogo[0]
+      : doacao.item_catalogo;
+    return {
+      id: doacao.id,
+      item: doacao.item || [catalogo?.nome, catalogo?.tamanho].filter(Boolean).join(" · ") || doacao.descricao_outros || "Item não informado",
+      quantidade: doacao.quantidade,
+      doador: doacao.doador,
+      createdAt: doacao.created_at,
+      campanhaId: doacao.campanha_id,
+    };
+  });
+  return {
+    pendentes: pendentes.count ?? 0,
+    andamento: andamento.count ?? 0,
+    concluidas: concluidas.count ?? 0,
+    doacoes: recentes,
+  };
 }
 
 export async function listCaravaneiros(): Promise<CaravaneiroRow[]> {

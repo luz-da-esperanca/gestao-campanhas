@@ -68,6 +68,7 @@ type RouteMapEditorProps = {
   onSave: (nome: string, path: MapPoint[]) => void;
   onDelete: (rotaId: string) => void;
   pending?: boolean;
+  readOnly?: boolean;
 };
 
 export function RouteMapEditor({
@@ -75,12 +76,13 @@ export function RouteMapEditor({
   onSave,
   onDelete,
   pending,
+  readOnly = false,
 }: RouteMapEditorProps) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [points, setPoints] = useState<MapPoint[]>([]);
   const [nome, setNome] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(savedRotas[0]?.id ?? null);
   const [gpsActive, setGpsActive] = useState(false);
   const [userPos, setUserPos] = useState<MapPoint | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
@@ -96,6 +98,7 @@ export function RouteMapEditor({
     displayPath.length > 0 ? getPathCenter(displayPath) : defaultCenter;
 
   const startDrawing = () => {
+    if (readOnly) return;
     setPreviewId(null);
     setPoints([]);
     setIsDrawing(true);
@@ -109,6 +112,7 @@ export function RouteMapEditor({
   };
 
   const handleSave = () => {
+    if (readOnly) return;
     if (!nome.trim() || nome.trim().length < 2) {
       setError("Dê um nome para a rota antes de salvar.");
       return;
@@ -198,7 +202,9 @@ export function RouteMapEditor({
         </Button>
 
         <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
-          {isDrawing
+          {readOnly
+            ? "Rotas sincronizadas com a distribuição. Selecione uma rota para visualizar ou personalize o percurso da coleta acima."
+            : isDrawing
             ? "Modo desenho ativo: clique no mapa para marcar cada ponto do percurso."
             : "Clique em “Começar a desenhar” e marque os pontos no mapa ao lado."}
         </div>
@@ -209,7 +215,7 @@ export function RouteMapEditor({
           </Alert>
         )}
 
-        <div className="space-y-2">
+        {!readOnly && <div className="space-y-2">
           <Label htmlFor="rota-nome">Nome da rota</Label>
           <Input
             id="rota-nome"
@@ -219,9 +225,9 @@ export function RouteMapEditor({
             className="h-10 bg-background"
             disabled={!isDrawing && points.length === 0}
           />
-        </div>
+        </div>}
 
-        <div className="flex flex-col gap-2">
+        {!readOnly && <div className="flex flex-col gap-2">
           {!isDrawing ? (
             <Button
               type="button"
@@ -255,7 +261,7 @@ export function RouteMapEditor({
               </Button>
             </>
           )}
-        </div>
+        </div>}
 
         {isDrawing && points.length > 0 && (
           <div className="flex items-center justify-between text-sm">
@@ -307,15 +313,16 @@ export function RouteMapEditor({
                       <ExternalLink className="size-3" />
                       Google Maps
                     </Button>
-                    <Button
+                    {!readOnly && <Button
                       type="button"
                       size="sm"
                       variant="destructive"
+                      disabled={pending}
                       className="h-8 gap-1 text-xs"
                       onClick={() => onDelete(rota.id)}
                     >
                       <Trash2 className="size-3" />
-                    </Button>
+                    </Button>}
                   </div>
                 </div>
               ))

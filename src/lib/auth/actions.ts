@@ -11,6 +11,7 @@ import { getUserById } from "@/lib/data/users";
 import { requireSessionUser } from "@/lib/auth/session";
 import { createAuthUser, syncUserMetadata } from "@/lib/auth/users";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { getLoginErrorMessage } from "@/lib/auth/login-error";
 
 const loginSchema = z.object({
   email: z.string().email("E-mail inválido"),
@@ -38,7 +39,7 @@ export async function loginAction(formData: FormData) {
   const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
-    return { error: "E-mail ou senha incorretos" };
+    return { error: getLoginErrorMessage(error) };
   }
 
   const dbUser = await getUserById(data.user.id);
