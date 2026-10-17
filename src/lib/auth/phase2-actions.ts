@@ -169,7 +169,7 @@ export async function createCampanhaAction(formData: FormData) {
   if (campanha.tipo === "DISTRIBUICAO") {
     redirect(`/admin/campanhas/new?distribuicao=${encodeURIComponent(campanha.id)}`);
   }
-  redirect(`/admin/campanhas/${campanha.id}`);
+  redirect(`/admin/campanhas/${campanha.distribuicaoId ?? campanha.id}`);
 }
 
 export async function updateCampanhaStatusAction(
