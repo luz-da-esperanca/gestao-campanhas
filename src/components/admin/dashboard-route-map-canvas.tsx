@@ -6,6 +6,7 @@ import L from "leaflet";
 import { MapContainer, TileLayer, Polyline, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { RotaRow } from "@/lib/supabase/campanhas";
+import { getPathCenter } from "@/lib/maps/route-utils";
 
 const colors = ["#1976d2", "#2e7d32", "#c2410c", "#7e22ce"];
 
@@ -26,6 +27,7 @@ function MapBounds({ rotas }: { rotas: RotaRow[] }) {
 }
 
 export default function DashboardRouteMapCanvas({ rotas }: { rotas: RotaRow[] }) {
+  const center = getPathCenter(rotas.flatMap((rota) => rota.path));
   const [tileError, setTileError] = useState(false);
   const tileEvents = useMemo(() => ({
     tileerror: () => setTileError(true),
@@ -40,7 +42,7 @@ export default function DashboardRouteMapCanvas({ rotas }: { rotas: RotaRow[] })
         </p>
       )}
       <div className="relative isolate overflow-hidden rounded-xl border" aria-label="Mapa dos percursos das campanhas">
-        <MapContainer center={[0, 0]} zoom={2} scrollWheelZoom={false} style={{ height: 320, width: "100%" }}>
+        <MapContainer center={[center.lat, center.lng]} zoom={13} scrollWheelZoom={false} style={{ height: 320, width: "100%" }}>
           <TileLayer
             attribution={'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"

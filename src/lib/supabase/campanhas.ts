@@ -8,7 +8,6 @@ export type CampanhaRow = {
   status: CampanhaStatus;
   descricao: string | null;
   dataInicio: string | null;
-  dataFim: string | null;
   distribuicaoId: string | null;
   rotasPersonalizadas: boolean;
 };
@@ -74,7 +73,6 @@ function mapCampanha(row: Record<string, unknown>): CampanhaRow {
     status: row.status as CampanhaStatus,
     descricao: (row.descricao as string) ?? null,
     dataInicio: (row.data_inicio as string) ?? null,
-    dataFim: (row.data_fim as string) ?? null,
     distribuicaoId: (row.distribuicao_id as string) ?? null,
     rotasPersonalizadas: row.rotas_personalizadas === true,
   };
@@ -114,8 +112,7 @@ export async function createCampanha(input: {
   nome: string;
   tipo: CampanhaTipo;
   descricao?: string;
-  dataInicio?: string;
-  dataFim?: string;
+  dataInicio: string;
   distribuicaoId?: string;
 }) {
   const { data, error } = await getDb()
@@ -124,8 +121,7 @@ export async function createCampanha(input: {
       nome: input.nome,
       tipo: input.tipo,
       descricao: input.descricao ?? null,
-      data_inicio: input.dataInicio ?? null,
-      data_fim: input.dataFim ?? null,
+      data_inicio: input.dataInicio,
       status: "PLANEJADA",
       ...(input.distribuicaoId ? { distribuicao_id: input.distribuicaoId } : {}),
     })

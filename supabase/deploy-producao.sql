@@ -71,7 +71,7 @@
 --  reexecutadas isoladamente sem risco.
 --
 -- -----------------------------------------------------------------------------
---  CONTEÚDO (10 arquivos, na ordem de aplicação)
+--  CONTEÚDO (11 arquivos, na ordem de aplicação)
 -- -----------------------------------------------------------------------------
 --    1. 20260526150000_init.sql  (NÃO idempotente)
 --    2. 20260526160000_rls.sql  (NÃO idempotente)
@@ -83,6 +83,7 @@
 --    8. 20260828010000_updated_at_triggers.sql
 --    9. 20260828020000_timestamptz_instantes.sql
 --   10. 20260925000000_rotas_coleta_vinculadas.sql
+--   11. 20261019000000_cadastros_unicos_por_email.sql
 --
 --  Gerado por scripts/gerar-deploy-sql.ts a partir de supabase/migrations/.
 -- =============================================================================
@@ -91,7 +92,7 @@
 
 
 -- =============================================================================
--- BLOCO 1/10
+-- BLOCO 1/11
 -- ORIGEM: supabase/migrations/20260526150000_init.sql
 -- sha256(12): 025de74385b5   |   NÃO idempotente — ver aviso no topo
 -- =============================================================================
@@ -166,7 +167,7 @@ ALTER TABLE "caravaneiros"
 
 
 -- =============================================================================
--- BLOCO 2/10
+-- BLOCO 2/11
 -- ORIGEM: supabase/migrations/20260526160000_rls.sql
 -- sha256(12): bbcae9235e07   |   NÃO idempotente — ver aviso no topo
 -- =============================================================================
@@ -206,7 +207,7 @@ CREATE POLICY caravaneiros_all_admin ON "caravaneiros"
 
 
 -- =============================================================================
--- BLOCO 3/10
+-- BLOCO 3/11
 -- ORIGEM: supabase/migrations/20260602000000_phase2.sql
 -- sha256(12): fa3222ae27c1   |   idempotente
 -- =============================================================================
@@ -284,7 +285,7 @@ END $$;
 
 
 -- =============================================================================
--- BLOCO 4/10
+-- BLOCO 4/11
 -- ORIGEM: supabase/migrations/20260603000000_guest_solicitacoes.sql
 -- sha256(12): b51e2ed90704   |   idempotente
 -- =============================================================================
@@ -312,7 +313,7 @@ CREATE INDEX IF NOT EXISTS "solicitacoes_caravaneiro_status_idx"
 
 
 -- =============================================================================
--- BLOCO 5/10
+-- BLOCO 5/11
 -- ORIGEM: supabase/migrations/20260604000000_presenca.sql
 -- sha256(12): a1be43d00c62   |   NÃO idempotente — ver aviso no topo
 -- =============================================================================
@@ -343,7 +344,7 @@ CREATE INDEX IF NOT EXISTS "campanha_participantes_campanha_idx"
 
 
 -- =============================================================================
--- BLOCO 6/10
+-- BLOCO 6/11
 -- ORIGEM: supabase/migrations/20260605000000_cadastros_basicos.sql
 -- sha256(12): 4e4a616007c0   |   idempotente
 -- =============================================================================
@@ -373,7 +374,7 @@ ALTER TABLE "arrecadacoes"
 
 
 -- =============================================================================
--- BLOCO 7/10
+-- BLOCO 7/11
 -- ORIGEM: supabase/migrations/20260828000000_rls_completo.sql
 -- sha256(12): 1f8e1feff34b   |   idempotente
 -- =============================================================================
@@ -427,7 +428,7 @@ DROP POLICY IF EXISTS users_update_own ON "users";
 
 
 -- =============================================================================
--- BLOCO 8/10
+-- BLOCO 8/11
 -- ORIGEM: supabase/migrations/20260828010000_updated_at_triggers.sql
 -- sha256(12): 277a1a2f17ca   |   idempotente
 -- =============================================================================
@@ -507,7 +508,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON "tarefas"
 
 
 -- =============================================================================
--- BLOCO 9/10
+-- BLOCO 9/11
 -- ORIGEM: supabase/migrations/20260828020000_timestamptz_instantes.sql
 -- sha256(12): 91a761b63d00   |   idempotente
 -- =============================================================================
@@ -614,7 +615,7 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON "tarefas"
 
 
 -- =============================================================================
--- BLOCO 10/10
+-- BLOCO 10/11
 -- ORIGEM: supabase/migrations/20260925000000_rotas_coleta_vinculadas.sql
 -- sha256(12): 9b485d8fc13c   |   idempotente
 -- =============================================================================
@@ -703,7 +704,102 @@ NOTIFY pgrst, 'reload schema';
 
 
 -- =============================================================================
--- FIM — 10 blocos aplicados.
+-- BLOCO 11/11
+-- ORIGEM: supabase/migrations/20261019000000_cadastros_unicos_por_email.sql
+-- sha256(12): 080e6006715c   |   idempotente
+-- =============================================================================
+
+-- Um e-mail identifica uma pessoa, independentemente de caixa e espaços externos.
+-- Preserva registros históricos, inclusive solicitações repetidas já existentes.
+-- Os índices auxiliam a consulta; os triggers serializam novas escritas por e-mail.
+CREATE INDEX IF NOT EXISTS users_email_normalizado_idx
+  ON public.users (lower(btrim(email)));
+CREATE INDEX IF NOT EXISTS caravaneiros_email_normalizado_idx
+  ON public.caravaneiros (lower(btrim(email)));
+CREATE INDEX IF NOT EXISTS solicitacoes_email_normalizado_idx
+  ON public.solicitacoes_caravaneiro (lower(btrim(email)));
+
+CREATE OR REPLACE FUNCTION public.impedir_usuario_duplicado()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  NEW.email := lower(btrim(NEW.email));
+  PERFORM pg_advisory_xact_lock(hashtextextended(NEW.email, 0));
+
+  IF EXISTS (
+    SELECT 1 FROM public.users
+    WHERE lower(btrim(email)) = NEW.email AND id IS DISTINCT FROM NEW.id
+  ) OR EXISTS (
+    SELECT 1 FROM public.caravaneiros
+    WHERE lower(btrim(email)) = NEW.email AND user_id IS DISTINCT FROM NEW.id
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '23505', MESSAGE = 'Já existe um usuário com este e-mail.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS impedir_usuario_duplicado ON public.users;
+CREATE TRIGGER impedir_usuario_duplicado
+BEFORE INSERT OR UPDATE OF email ON public.users
+FOR EACH ROW EXECUTE FUNCTION public.impedir_usuario_duplicado();
+
+CREATE OR REPLACE FUNCTION public.impedir_caravaneiro_duplicado()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  NEW.email := lower(btrim(NEW.email));
+  IF NEW.email IS NULL THEN RETURN NEW; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended(NEW.email, 0));
+
+  IF EXISTS (
+    SELECT 1 FROM public.caravaneiros
+    WHERE lower(btrim(email)) = NEW.email AND id IS DISTINCT FROM NEW.id
+  ) OR EXISTS (
+    SELECT 1 FROM public.users
+    WHERE lower(btrim(email)) = NEW.email AND id IS DISTINCT FROM NEW.user_id
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '23505', MESSAGE = 'Já existe um caravaneiro com este e-mail.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS impedir_caravaneiro_duplicado ON public.caravaneiros;
+CREATE TRIGGER impedir_caravaneiro_duplicado
+BEFORE INSERT OR UPDATE OF email, user_id ON public.caravaneiros
+FOR EACH ROW EXECUTE FUNCTION public.impedir_caravaneiro_duplicado();
+
+CREATE OR REPLACE FUNCTION public.impedir_solicitacao_repetida()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
+BEGIN
+  NEW.email := lower(btrim(NEW.email));
+  -- O mesmo lock é usado pelos cadastros para cobrir submissões concorrentes.
+  PERFORM pg_advisory_xact_lock(hashtextextended(NEW.email, 0));
+
+  IF EXISTS (
+    SELECT 1 FROM public.solicitacoes_caravaneiro
+    WHERE lower(btrim(email)) = NEW.email AND id IS DISTINCT FROM NEW.id
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '23505', MESSAGE = 'Já existe uma solicitação com este e-mail.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.users WHERE lower(btrim(email)) = NEW.email
+  ) OR EXISTS (
+    SELECT 1 FROM public.caravaneiros WHERE lower(btrim(email)) = NEW.email
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '23505', MESSAGE = 'Já existe um cadastro com este e-mail.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS impedir_solicitacao_repetida ON public.solicitacoes_caravaneiro;
+CREATE TRIGGER impedir_solicitacao_repetida
+BEFORE INSERT OR UPDATE OF email ON public.solicitacoes_caravaneiro
+FOR EACH ROW EXECUTE FUNCTION public.impedir_solicitacao_repetida();
+
+
+-- =============================================================================
+-- FIM — 11 blocos aplicados.
 -- Confira no painel: Table Editor deve listar 10 tabelas, e
 -- Authentication > Policies deve mostrar RLS habilitado em todas elas.
 -- =============================================================================

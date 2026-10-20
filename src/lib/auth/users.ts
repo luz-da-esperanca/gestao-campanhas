@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/lib/auth/types";
+import { emailSchema } from "@/lib/auth/email";
 
 export async function syncUserMetadata(
   userId: string,
@@ -20,8 +21,9 @@ export async function createAuthUser(params: {
   active?: boolean;
 }) {
   const supabase = createAdminClient();
+  const email = emailSchema.parse(params.email);
   const { data, error } = await supabase.auth.admin.createUser({
-    email: params.email,
+    email,
     password: params.password,
     email_confirm: true,
     user_metadata: { name: params.name },
@@ -32,19 +34,24 @@ export async function createAuthUser(params: {
   });
 
   if (error || !data.user) {
+    if (error?.code === "email_exists" || error?.code === "user_already_exists") {
+      throw new Error("Já existe um usuário com este e-mail.");
+    }
     throw new Error(error?.message ?? "Falha ao criar usuário de autenticação");
   }
 
   const { error: dbError } = await supabase.from("users").insert({
     id: data.user.id,
-    email: params.email,
+    email,
     name: params.name,
     role: params.role,
   });
 
   if (dbError) {
     await supabase.auth.admin.deleteUser(data.user.id);
-    throw new Error(dbError.message);
+    throw new Error(dbError.code === "23505"
+      ? "Já existe um usuário com este e-mail."
+      : dbError.message);
   }
 
   return data.user;

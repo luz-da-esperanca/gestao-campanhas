@@ -36,6 +36,11 @@ function sha256(texto: string): string {
   return createHash("sha256").update(texto, "utf8").digest("hex");
 }
 
+function lerSql(caminho: string): string {
+  // O checkout do Windows usa CRLF; o artefato e seus hashes devem ser iguais no CI.
+  return readFileSync(caminho, "utf8").replace(/\r\n/g, "\n");
+}
+
 function listarMigrations(): string[] {
   return readdirSync(DIR_MIGRATIONS)
     .filter((f) => f.endsWith(".sql"))
@@ -134,7 +139,7 @@ ${indice}--
 `);
 
   arquivos.forEach((nome, i) => {
-    const conteudo = readFileSync(join(DIR_MIGRATIONS, nome), "utf8");
+    const conteudo = lerSql(join(DIR_MIGRATIONS, nome));
     const hash = sha256(conteudo).slice(0, 12);
     const idem =
       nome in NAO_IDEMPOTENTES
@@ -182,7 +187,7 @@ function verificar(arquivos: string[]): number {
     return 1;
   }
 
-  const atual = readFileSync(ARQUIVO_SAIDA, "utf8");
+  const atual = lerSql(ARQUIVO_SAIDA);
   const esperado = montarConteudo(arquivos);
 
   if (atual === esperado) {
@@ -200,7 +205,7 @@ function verificar(arquivos: string[]): number {
   const atuaisPorNome = new Map(
     arquivos.map((n) => [
       n,
-      sha256(readFileSync(join(DIR_MIGRATIONS, n), "utf8")).slice(0, 12),
+      sha256(lerSql(join(DIR_MIGRATIONS, n))).slice(0, 12),
     ]),
   );
 

@@ -92,12 +92,27 @@ o mesmo banco, com o risco de divergirem outra vez.
 
 ## Funcionalidades
 
-- **Campanhas:** planejada → ativa → encerrada
-- **Rotas:** mapa no admin, visualização pública, export Google Maps
+- **Campanhas:** uma única data por campanha; planejada → ativa → encerrada. A data é gravada em `data_inicio`; `data_fim` permanece apenas como dado legado.
+- **Rotas:** mapa no admin, visualização pública, export Google Maps. O editor sem rotas tenta iniciar na localização do celular; sem acesso ao GPS, usa Parnaíba (PI). É possível arrastar o mapa para escolher outra região ou usar “Mostrar minha localização”.
 - **Participantes:** convocar caravaneiros por campanha
 - **Chamada (presença):** escanear QR ou marcar na lista (campanha ativa)
 - **Arrecadações:** após encerrar campanha
 - **Solicitações:** formulário público → admin aprova e cria login
+
+### Cadastros sem duplicidade
+
+O e-mail do login identifica o usuário, ignorando maiúsculas e espaços nas pontas.
+Um usuário já cadastrado não pode solicitar acesso novamente; solicitações
+pendentes, aprovadas ou recusadas também impedem um novo pedido com o mesmo e-mail.
+Pessoas com o mesmo nome e e-mails distintos continuam permitidas.
+
+O bloqueio exige a migration `20261019000000_cadastros_unicos_por_email.sql`.
+Ela preserva os registros históricos e protege novas inserções e alterações de
+e-mail no banco. Os testes usam PostgreSQL em memória, sem credenciais externas:
+
+```bash
+node --import tsx --test src/lib/auth/email.test.ts src/lib/supabase/cadastros-unicos.test.ts
+```
 
 ### Distribuição e coleta com as mesmas rotas
 
