@@ -18,10 +18,11 @@ import {
   personalizarRotasColeta,
 } from "@/lib/supabase/campanhas";
 import type { CampanhaStatus, CampanhaTipo } from "@/lib/auth/types";
+import { emailSchema } from "@/lib/auth/email";
 
 const solicitarSchema = z.object({
   nome: z.string().min(2, "Nome obrigatório"),
-  email: z.string().email("E-mail inválido"),
+  email: emailSchema,
   telefone: z.string().optional(),
   mensagem: z.string().optional(),
 });
@@ -90,7 +91,9 @@ export async function aprovarSolicitacaoAction(
       const supabase = createAdminClient();
       await supabase.from("users").delete().eq("id", authUser.id);
       await supabase.auth.admin.deleteUser(authUser.id);
-      return { error: cErr.message };
+      return { error: cErr.code === "23505"
+        ? "Já existe um caravaneiro com este e-mail."
+        : cErr.message };
     }
 
     await updateSolicitacaoStatus(solicitacaoId, "APROVADA");

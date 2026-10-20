@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/supabase/db";
+import { emailSchema } from "@/lib/auth/email";
 
 export type SolicitacaoStatus = "PENDENTE" | "APROVADA" | "RECUSADA";
 
@@ -49,11 +50,14 @@ export async function createSolicitacao(input: {
 }) {
   const { error } = await getDb().from("solicitacoes_caravaneiro").insert({
     nome: input.nome,
-    email: input.email,
+    email: emailSchema.parse(input.email),
     telefone: input.telefone ?? null,
     mensagem: input.mensagem ?? null,
     status: "PENDENTE",
   });
+  if (error?.code === "23505") {
+    throw new Error("Este e-mail já possui um cadastro ou uma solicitação. Entre em contato com a administração.");
+  }
   if (error) throw error;
 }
 

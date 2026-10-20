@@ -12,9 +12,10 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { createAuthUser, syncUserMetadata } from "@/lib/auth/users";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getLoginErrorMessage } from "@/lib/auth/login-error";
+import { emailSchema } from "@/lib/auth/email";
 
 const loginSchema = z.object({
-  email: z.string().email("E-mail inválido"),
+  email: emailSchema,
   password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
 });
 
@@ -80,7 +81,7 @@ export async function logoutAction() {
 
 const adminSchema = z.object({
   name: z.string().min(2, "Nome obrigatório"),
-  email: z.string().email("E-mail inválido"),
+  email: emailSchema,
   password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
 });
 
@@ -131,7 +132,7 @@ export async function deleteAdminAction(userId: string) {
 
 const caravaneiroSchema = z.object({
   nome: z.string().min(2, "Nome obrigatório"),
-  email: z.string().email("E-mail inválido"),
+  email: emailSchema,
   telefone: z.string().optional(),
   password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
 });
@@ -174,7 +175,9 @@ export async function createCaravaneiroAction(formData: FormData) {
       const supabase = createAdminClient();
       await supabase.from("users").delete().eq("id", authUser.id);
       await supabase.auth.admin.deleteUser(authUser.id);
-      throw new Error(error.message);
+      throw new Error(error.code === "23505"
+        ? "Já existe um caravaneiro com este e-mail."
+        : error.message);
     }
 
     revalidatePath("/admin/caravaneiros");
