@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import {
   MapContainer,
@@ -35,14 +35,35 @@ import {
 } from "@/lib/maps/route-utils";
 import type { RotaRow } from "@/lib/supabase/campanhas";
 
-const defaultCenter: MapPoint = { lat: -23.5505, lng: -46.6333 };
+function CenterOnLocation({ position, isDrawing }: {
+  position: MapPoint | null;
+  isDrawing: boolean;
+}) {
+  const map = useMap();
+  const centered = useRef(false);
+
+  useEffect(() => {
+    const keepChosenPosition = () => { centered.current = true; };
+    map.on("dragstart", keepChosenPosition);
+    return () => { map.off("dragstart", keepChosenPosition); };
+  }, [map]);
+
+  useEffect(() => {
+    if (isDrawing) centered.current = true;
+    if (!position || centered.current) return;
+    map.setView([position.lat, position.lng], 16, { animate: false });
+    centered.current = true;
+  }, [map, position, isDrawing]);
+
+  return null;
+}
 
 function FitBounds({ points }: { points: MapPoint[] }) {
   const map = useMap();
   useEffect(() => {
     if (points.length < 2) return;
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
-    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 16 });
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 16, animate: false });
   }, [map, points]);
   return null;
 }
@@ -83,7 +104,9 @@ export function RouteMapEditor({
   const [nome, setNome] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(savedRotas[0]?.id ?? null);
-  const [gpsActive, setGpsActive] = useState(false);
+  const [gpsActive, setGpsActive] = useState(() =>
+    savedRotas.length === 0 && typeof navigator !== "undefined" && Boolean(navigator.geolocation),
+  );
   const [userPos, setUserPos] = useState<MapPoint | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
 
@@ -94,8 +117,7 @@ export function RouteMapEditor({
   }, [previewId, savedRotas]);
 
   const displayPath = isDrawing ? points : previewPath;
-  const mapCenter =
-    displayPath.length > 0 ? getPathCenter(displayPath) : defaultCenter;
+  const mapCenter = getPathCenter(displayPath);
 
   const startDrawing = () => {
     if (readOnly) return;
@@ -143,14 +165,17 @@ export function RouteMapEditor({
       setError("Geolocalização não disponível neste navegador.");
       return;
     }
+    setError(null);
     setGpsActive(true);
   };
 
   useEffect(() => {
     if (!gpsActive) return;
 
+    let active = true;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        if (!active) return;
         setUserPos({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -158,13 +183,17 @@ export function RouteMapEditor({
         setAccuracy(pos.coords.accuracy);
       },
       () => {
-        setError("Não foi possível acessar sua localização.");
+        if (!active) return;
+        setError("Não foi possível acessar sua localização. Arraste o mapa para escolher outro ponto.");
         setGpsActive(false);
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 },
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      active = false;
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [gpsActive]);
 
   const openGoogleMaps = (path: MapPoint[]) => {
@@ -200,6 +229,11 @@ export function RouteMapEditor({
           <Navigation className="size-4" />
           {gpsActive ? "Parar rastreamento" : "Mostrar minha localização"}
         </Button>
+
+        <p className="text-xs text-muted-foreground">
+          Sem localização disponível, o mapa inicia em Parnaíba (PI). Arraste o mapa
+          para escolher outra região.
+        </p>
 
         <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
           {readOnly
@@ -295,6 +329,9 @@ export function RouteMapEditor({
                       setIsDrawing(false);
                       setPoints([]);
                       setPreviewId(rota.id);
+                      setGpsActive(false);
+                      setUserPos(null);
+                      setAccuracy(null);
                     }}
                   >
                     <span className="font-medium text-sm">{rota.nome}</span>
@@ -346,6 +383,7 @@ export function RouteMapEditor({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <MapClickHandler enabled={isDrawing} onAdd={addPoint} />
+          {gpsActive && <CenterOnLocation position={userPos} isDrawing={isDrawing} />}
           {displayPath.length >= 2 && (
             <FitBounds points={displayPath} />
           )}

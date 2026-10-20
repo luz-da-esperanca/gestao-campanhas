@@ -47,7 +47,7 @@ export function RouteMapViewer({ rotas }: { rotas: RouteItem[] }) {
   );
 
   const path = selected?.path ?? [];
-  const center = path.length > 0 ? getPathCenter(path) : { lat: -23.5505, lng: -46.6333 };
+  const center = getPathCenter(path);
 
   if (rotas.length === 0) {
     return (

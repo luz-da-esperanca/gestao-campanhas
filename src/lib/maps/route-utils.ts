@@ -1,5 +1,8 @@
 export type MapPoint = { lat: number; lng: number };
 
+/** Parnaíba (PI): ponto inicial quando não há rota nem localização disponível. */
+export const DEFAULT_MAP_CENTER: MapPoint = { lat: -2.92, lng: -41.76 };
+
 /** Identifica vértices importantes para exportar ao Google Maps (limite ~10 pontos). */
 function getTurnSharpness(
   p1: MapPoint,
@@ -45,7 +48,7 @@ export function buildGoogleMapsDirectionsUrl(path: MapPoint[]): string {
 }
 
 export function getPathCenter(path: MapPoint[]): MapPoint {
-  if (path.length === 0) return { lat: -23.5505, lng: -46.6333 };
+  if (path.length === 0) return DEFAULT_MAP_CENTER;
   const lat = path.reduce((s, p) => s + p.lat, 0) / path.length;
   const lng = path.reduce((s, p) => s + p.lng, 0) / path.length;
   return { lat, lng };
