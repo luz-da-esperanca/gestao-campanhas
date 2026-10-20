@@ -33,7 +33,7 @@ export function CreateCampanhaForm({ arrecadacao }: {
           {arrecadacao
             ? arrecadacao.data
               ? "Sugerimos o domingo seguinte à distribuição de panfletos. Você pode alterar a data em caso de feriado, eleição ou outro compromisso. A arrecadação só será criada ao confirmar."
-              : "A distribuição não tem data de início. Escolha a data da arrecadação; ela só será criada ao confirmar."
+              : "A distribuição não tem data definida. Escolha a data da arrecadação; ela só será criada ao confirmar."
             : "Após criar, você pode desenhar rotas no mapa e ativar a campanha."}
         </CardDescription>
       </CardHeader>
@@ -79,22 +79,16 @@ export function CreateCampanhaForm({ arrecadacao }: {
             <Label htmlFor="descricao">Descrição</Label>
             <Input id="descricao" name="descricao" className="h-11" />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="dataInicio">Data início</Label>
-              <Input
-                id="dataInicio"
-                name="dataInicio"
-                type="date"
-                defaultValue={arrecadacao?.data}
-                required={Boolean(arrecadacao)}
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dataFim">Data fim</Label>
-              <Input id="dataFim" name="dataFim" type="date" className="h-11" />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="dataInicio">Data da campanha (obrigatória)</Label>
+            <Input
+              id="dataInicio"
+              name="dataInicio"
+              type="date"
+              defaultValue={arrecadacao?.data}
+              required
+              className="h-11"
+            />
           </div>
           <Button type="submit" disabled={pending} className="h-11">
             {pending ? "Criando..." : arrecadacao ? "Confirmar campanha de arrecadação" : "Criar campanha"}

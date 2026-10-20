@@ -92,7 +92,7 @@ o mesmo banco, com o risco de divergirem outra vez.
 
 ## Funcionalidades
 
-- **Campanhas:** planejada → ativa → encerrada
+- **Campanhas:** uma única data por campanha; planejada → ativa → encerrada. A data é gravada em `data_inicio`; `data_fim` permanece apenas como dado legado.
 - **Rotas:** mapa no admin, visualização pública, export Google Maps
 - **Participantes:** convocar caravaneiros por campanha
 - **Chamada (presença):** escanear QR ou marcar na lista (campanha ativa)

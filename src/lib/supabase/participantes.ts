@@ -26,7 +26,6 @@ function mapCampanha(row: Record<string, unknown>) {
     status: row.status as CampanhaStatus,
     descricao: (row.descricao as string) ?? null,
     dataInicio: (row.data_inicio as string) ?? null,
-    dataFim: (row.data_fim as string) ?? null,
     distribuicaoId: (row.distribuicao_id as string) ?? null,
     rotasPersonalizadas: row.rotas_personalizadas === true,
   };
